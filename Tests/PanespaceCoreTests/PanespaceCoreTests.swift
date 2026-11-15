@@ -988,8 +988,8 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(try c("move container to workspace to do"), .moveToWorkspace(.name("to do")))
         XCTAssertEqual(try c("workspace number 2 output next"), .workspaceOnOutput(.number("2"), .next))
         XCTAssertEqual(try c("workspace Audio output stuff"), .workspace(.name("Audio output stuff"), noAutoBackAndForth: false))
-        XCTAssertTrue(Config.parse("bindcode $mod+38 focus left").warnings.contains { $0.contains("macOS key codes") })
-        XCTAssertTrue(Config.parse("bindsym $mod+a focus left").warnings.isEmpty)
+        XCTAssertTrue(Config.parse("set $mod alt\nbindcode $mod+38 focus left").warnings.contains { $0.contains("macOS key codes") })
+        XCTAssertTrue(Config.parse("set $mod alt\nbindsym $mod+a focus left").warnings.isEmpty)
         XCTAssertEqual(try c("move left 20 px"), .move(.left, px: 20))
         XCTAssertEqual(try c("resize grow width 10 px or 5 ppt"),
                        .resize(ResizeArg(grow: true, dimension: .width, px: 10, ppt: 5)))
