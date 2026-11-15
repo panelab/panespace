@@ -4,13 +4,13 @@ import PackageDescription
 let package = Package(
     name: "panespace",
     platforms: [.macOS(.v13)],
-    dependencies: [
-        // Auto-updates for Panespace.app, from the appcast attached to each GitHub release.
-        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.4"),
-    ],
     products: [
         .executable(name: "panespace", targets: ["panespace"]),
         .executable(name: "caps", targets: ["caps"]),
+    ],
+    dependencies: [
+        // Auto-updates for Panespace.app, from the appcast attached to each GitHub release.
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.4"),
     ],
     targets: [
         // Pure window-management logic: tree, layout, config, commands. No AppKit, fully unit-tested.
