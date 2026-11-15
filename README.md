@@ -9,6 +9,8 @@
   Your i3 config, instant workspaces, and nothing to disable: no SIP changes, no Dock injection.
 </p>
 
+<p align="center"><b>Public beta.</b> Expect rough edges, and please <a href="https://github.com/panelab/panespace/issues">report what breaks</a>.</p>
+
 <p align="center">
   <a href="https://panespace.pages.dev">Website</a> ·
   <a href="https://github.com/panelab/panespace/releases/latest">Download</a> ·

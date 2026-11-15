@@ -19,7 +19,7 @@
         document.querySelectorAll("[data-download]").forEach((a) => (a.href = zip.browser_download_url));
         document.querySelectorAll("[data-zip-name]").forEach((el) => (el.textContent = zip.name));
       }
-      document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "Version " + version));
+      document.querySelectorAll("[data-version]").forEach((el) => (el.textContent = "Public beta, version " + version));
       const link = document.querySelector("[data-release-link]");
       if (link && rel.html_url) link.href = rel.html_url;
       const text = document.querySelector("[data-release-text]");
