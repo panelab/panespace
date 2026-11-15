@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://panespace.pages.dev">Website</a> ·
   <a href="https://github.com/panelab/panespace/releases/latest">Download</a> ·
   <a href="#install">Install</a> ·
   <a href="#keys">Keys</a> ·
@@ -127,6 +128,12 @@ panespace stats                  # key-to-frame latency, frame rate, scan times,
 make test     # unit tests
 make app      # build and sign the apps
 make icon     # regenerate the app icon from scripts/make-icon.swift
+```
+
+The website lives in `site/` (static HTML, CSS and a little JS, no build step) and is served at [panespace.pages.dev](https://panespace.pages.dev) by Cloudflare Pages:
+
+```sh
+wrangler pages deploy site --project-name panespace --branch main
 ```
 
 ### Releasing
