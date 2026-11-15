@@ -12,11 +12,13 @@ public struct SwitcherEntry: Equatable {
     public let isFloating: Bool
     /// Minimized, or its app hidden: out of the layout until it's picked.
     public let isAway: Bool
+    /// In macOS full screen, on its own Space: picking it goes there.
+    public let isFullScreen: Bool
 
     public init(id: WindowID, app: String, bundleID: String, pid: pid_t, title: String, workspace: String?,
-                isFloating: Bool, isAway: Bool = false) {
+                isFloating: Bool, isAway: Bool = false, isFullScreen: Bool = false) {
         (self.id, self.app, self.bundleID, self.pid, self.title) = (id, app, bundleID, pid, title)
-        (self.workspace, self.isFloating, self.isAway) = (workspace, isFloating, isAway)
+        (self.workspace, self.isFloating, self.isAway, self.isFullScreen) = (workspace, isFloating, isAway, isFullScreen)
     }
 }
 

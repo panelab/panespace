@@ -57,13 +57,26 @@ final class CapsTap {
         return true
     }
 
+    /// Ends a hold whose key-up was missed: the overlay goes away and every remapped key gets its key-up.
+    private func releaseHold() {
+        let (wasHeld, keys) = lock.withLock { () -> (Bool, [KeyCombo]) in
+            let r = (held, Array(remapped.values))
+            held = false
+            remapped = [:]
+            return r
+        }
+        for k in keys { post(k, down: false) }
+        if wasHeld { DispatchQueue.main.async { self.onCapsUp() } }
+    }
+
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
         if event.getIntegerValueField(.eventSourceUserData) == CapsLock.syntheticTag { return pass }  // ours
 
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            lock.withLock { held = false }
+            // Caps may have come up while the tap was off: finish the hold (overlay away, remapped keys up).
+            releaseHold()
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return pass
 
@@ -84,7 +97,10 @@ final class CapsTap {
             }
             let physicallyDown = CapsLock.isPhysicallyDown
             let lookup = lock.withLock { () -> (Bool, CapsAction?) in
-                if held && !physicallyDown { held = false }  // missed the key-up: never leave Caps stuck
+                if held && !physicallyDown {  // missed the key-up: never leave Caps stuck
+                    held = false
+                    DispatchQueue.main.async { self.onCapsUp() }
+                }
                 guard held else { return (false, nil) }
                 if !usedWhileHeld { DispatchQueue.main.async { self.onKeyWhileHeld() } }
                 usedWhileHeld = true

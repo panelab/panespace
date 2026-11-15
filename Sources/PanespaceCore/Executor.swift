@@ -83,7 +83,15 @@ extension Model {
                 let anchor = dst.descend(dst.root, dir, from: node.rect)
                 moveNode(node, to: dst, anchor: anchor, before: dir.isForward)
                 switchTo(dst)
-                if let c = node as? Container { dst.selected = c } else if let w = node as? WindowNode { setFocus(w) }
+                if let c = node as? Container {
+                    // normalize() may have dissolved it into the destination's root (an empty display): then
+                    // focus what it held rather than a detached, empty container.
+                    if c.parent != nil, c.treeRoot === dst.root {
+                        dst.selected = c
+                    } else if let w = dst.mostRecentTiled {
+                        setFocus(w)
+                    }
+                } else if let w = node as? WindowNode { setFocus(w) }
             }
 
         case .moveToWorkspace(let t):
@@ -163,7 +171,9 @@ extension Model {
             ws.split(node, o ?? node.parent!.layout.orientation.opposite)
 
         case .layout(let arg):
-            guard let node else { break }
+            // A floating or scratchpad window isn't in the tree: it has no container to lay out (and must not
+            // change the whole workspace's).
+            guard let node, !((node as? WindowNode)?.isFloating ?? false) else { break }
             let c: Container = (node === ws.selected ? node as? Container : nil) ?? node.parent ?? ws.root
             switch arg {
             case .set(let l): c.layout = l
@@ -183,9 +193,9 @@ extension Model {
             return [.nativeFullscreen(win?.id, tg)]
 
         case .fullscreen(let tg), .zoom(let tg):
-            guard let w = win else { break }
-            let on = tg == .toggle ? ws.fullscreen !== w : tg == .enable
-            ws.fullscreen = on ? w : (ws.fullscreen === w ? nil : ws.fullscreen)
+            guard let w = win, let home = w.workspace else { break }  // hidden in the scratchpad: nothing to zoom
+            let on = tg == .toggle ? home.fullscreen !== w : tg == .enable
+            home.fullscreen = on ? w : (home.fullscreen === w ? nil : home.fullscreen)
 
         case .floating(let tg):
             guard let w = win else { break }
@@ -253,7 +263,7 @@ extension Model {
             }
 
         case .pin(let tg):
-            guard let w = win else { break }
+            guard let w = win, w.workspace != nil else { break }  // a hidden scratchpad window can't be pinned
             let on = tg == .toggle ? !w.isPinned : tg == .enable
             if on && !w.isFloating { setFloating(w, true) }  // only a floating window can hover over every workspace
             w.isPinned = on && w.isFloating
@@ -271,7 +281,14 @@ extension Model {
         guard w.isFloating != on, let ws = w.workspace else { return }
         if on {
             if w.floatingFrame == nil || !(monitor(ws.monitorID)?.visibleFrame.intersects(w.floatingFrame!) ?? true) {
-                w.floatingFrame = w.rect
+                // Never laid out (its workspace isn't shown): its preferred size, or a sensible default.
+                if w.rect.width > 0, w.rect.height > 0 {
+                    w.floatingFrame = w.rect
+                } else if let v = monitor(ws.monitorID)?.visibleFrame {
+                    let p = w.preferredSize.flatMap { $0.width > 0 && $0.height > 0 ? $0 : nil }
+                        ?? CGSize(width: v.width * 0.6, height: v.height * 0.6)
+                    w.floatingFrame = centered(size: p, in: v)
+                }
             }
             ws.detachTiled(w)
             w.isFloating = true

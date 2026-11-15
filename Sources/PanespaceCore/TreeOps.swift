@@ -219,11 +219,14 @@ extension Workspace {
                     case .ppt(let v): d = v * len / 100
                     }
                     let least = max(len * 0.05, 40)
-                    d = min(d, sizes[j] - max(least, mins[j]))
-                    d = max(d, max(least, mins[i]) - sizes[i])
+                    let upper = sizes[j] - max(least, mins[j])  // most i can take from j
+                    let lower = max(least, mins[i]) - sizes[i]  // least i can be left with
+                    // The apps' minimum sizes don't fit as it is: no resize keeps both windows usable.
+                    guard lower <= upper else { return false }
+                    d = min(max(d, lower), upper)
                     sizes[i] += d
                     sizes[j] -= d
-                    for (n, s) in zip(p.children, sizes) { n.weight = s }
+                    for (n, s) in zip(p.children, sizes) { n.weight = max(s, 1) }
                     return true
                 }
             }

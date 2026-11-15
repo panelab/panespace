@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/broisnischal/panespace/releases/latest">Download</a> ·
+  <a href="https://github.com/panelab/panespace/releases/latest">Download</a> ·
   <a href="#install">Install</a> ·
   <a href="#keys">Keys</a> ·
   <a href="#configuration">Configuration</a>
@@ -34,7 +34,7 @@
 
 ## Install
 
-Download `Panespace-<version>.zip` from [Releases](https://github.com/broisnischal/panespace/releases), unzip it into `~/Applications` and open it. The app isn't notarized, so the first time, right-click it and choose **Open**.
+Download `Panespace-<version>.zip` from [Releases](https://github.com/panelab/panespace/releases), unzip it into `~/Applications` and open it. The app isn't notarized, so the first time, right-click it and choose **Open**.
 
 Or build it from source (needs Xcode or the Swift toolchain):
 
@@ -44,6 +44,8 @@ make login-item    # start at login
 ```
 
 On first launch, allow Panespace in **System Settings → Privacy & Security → Accessibility**.
+
+Panespace updates itself: it checks once a day, and **Check for Updates…** is in its menu (turn automatic checks off under **Settings**). Builds from source check too once `Resources/sparkle-public-key` is in place.
 
 Before you start:
 - Quit other window managers (AeroSpace, yabai, Amethyst) and turn off Rectangle's drag-to-snap.
@@ -126,3 +128,17 @@ make test     # unit tests
 make app      # build and sign the apps
 make icon     # regenerate the app icon from scripts/make-icon.swift
 ```
+
+### Releasing
+
+Releases are built and published by GitHub Actions ([release.yml](.github/workflows/release.yml)) when a version tag is pushed:
+
+1. Bump `CFBundleShortVersionString` **and** `CFBundleVersion` in `Resources/Info.plist` and `Resources/Caps-Info.plist`. Sparkle compares `CFBundleVersion`, so it must go up every release.
+2. Merge to `main`, then tag and push: `git tag v0.3.0 && git push origin v0.3.0`.
+3. The workflow tests, builds universal apps signed with the *Panespace Release Signing* identity, signs the update feed, checks every signature, and publishes `Panespace-<version>.zip`, `Caps-<version>.zip` and `appcast.xml` to the release.
+
+Installed copies find the update through `releases/latest/download/appcast.xml` (Sparkle, EdDSA-signed).
+
+Repository secrets used by the workflow: `SPARKLE_PRIVATE_KEY` (base64 EdDSA seed, the private half of `Resources/sparkle-public-key`), `SIGNING_CERT_P12` (base64 PKCS#12 of the release signing identity) and `SIGNING_CERT_PASSWORD`. Keep offline backups of both keys: a release signed with a different key can't update existing installs, and a different signing identity makes macOS ask for Accessibility again.
+
+`make dist` does the same locally (with the Sparkle key from your Keychain, see `make sparkle-keys`).

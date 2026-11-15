@@ -3,7 +3,8 @@ import MacKit
 import ApplicationServices
 import PanespaceCore
 
-let panespaceVersion = "0.1.0"
+/// The app's own version (Info.plist), so the CLI, `get_version` and the updater never disagree.
+let panespaceVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
 
 let help = """
 panespace \(panespaceVersion) — i3-style tiling window manager for macOS
@@ -75,9 +76,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let wm = WindowManager(configURL: configURL())
         self.wm = wm
         wm.start()
+        Updater.shared.start()
     }
 
-    func applicationWillTerminate(_ notification: Notification) { wm?.restoreAllWindows() }
+    /// Logout, or Sparkle relaunching after an update: undo everything, not only the windows (the menu bar would
+    /// stay hidden and Caps Lock remapped).
+    func applicationWillTerminate(_ notification: Notification) { wm?.cleanup() }
 }
 
 var signalSources: [DispatchSourceSignal] = []
@@ -87,6 +91,7 @@ func runDaemon() -> Never {
         fputs("panespace: already running\n", stderr)
         exit(0)  // not a failure: launchd's KeepAlive must not keep relaunching a duplicate
     }
+    signal(SIGPIPE, SIG_IGN)  // an IPC client that hangs up early must not kill the daemon
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     let delegate = AppDelegate()

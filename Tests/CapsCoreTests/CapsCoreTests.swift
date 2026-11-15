@@ -12,6 +12,19 @@ final class CapsConfigTests: XCTestCase {
         XCTAssertEqual(CapsConfig.parse("tap escape").tap, .key(k("escape")))
     }
 
+    /// An app block whose pattern isn't a valid regex is skipped whole: its bindings must not become global.
+    func testBadAppPatternDropsItsBlock() {
+        let c = CapsConfig.parse("""
+        app "Safari(" {
+            bind x key cmd+w
+        }
+        bind t open Ghostty
+        """)
+        XCTAssertEqual(c.warnings.count, 1)
+        XCTAssertNil(c.action(for: k("x"), app: "Notes", bundleID: ""))
+        XCTAssertEqual(c.action(for: k("t"), app: "Notes", bundleID: ""), .open("Ghostty"))
+    }
+
     func testAppLayerBeatsGlobalAndFallsThrough() {
         let c = CapsConfig.parse("""
         bind t open Ghostty

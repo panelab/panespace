@@ -96,6 +96,8 @@ public struct CapsConfig {
     public static func parse(_ text: String) -> CapsConfig {
         var c = CapsConfig()
         var layer: AppLayer?
+        /// Inside an app block whose pattern didn't parse: its bindings are dropped, not made global.
+        var skipping = false
         for (n, raw) in text.components(separatedBy: .newlines).enumerated() {
             let trimmed = raw.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
@@ -114,6 +116,10 @@ public struct CapsConfig {
                 if let first = comment.first { note = first.uppercased() + comment.dropFirst() }
             }
             func warn(_ s: String) { c.warnings.append("line \(n + 1): \(s)") }
+            if skipping {
+                if line == "}" { skipping = false }
+                continue
+            }
             if line == "}" {
                 if let l = layer { c.apps.append(l) } else { warn("unexpected '}'") }
                 layer = nil
@@ -131,7 +137,8 @@ public struct CapsConfig {
                 do {
                     layer = AppLayer(pattern: pattern, regex: try NSRegularExpression(pattern: pattern, options: .caseInsensitive))
                 } catch {
-                    warn("bad app pattern '\(pattern)'")
+                    warn("bad app pattern '\(pattern)'; its bindings are ignored")
+                    skipping = true
                 }
             case "bind":
                 let spec = bindKey ?? ""
