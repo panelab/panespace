@@ -560,8 +560,8 @@ final class WindowManager {
                         floatingModifier: model.config.floatingModifier, capsLock: caps,
                         interceptFullscreen: model.config.interceptNativeFullscreen,
                         oneShot: model.config.oneShotModes.contains(model.mode),
-                        defaults: model.config.modes["default"] ?? [:],
-                        scrollWorkspaces: model.config.workspaceScroll)
+                        scrollWorkspaces: model.config.workspaceScroll,
+                        defaults: model.config.modes["default"] ?? [:])
         updateTrackpad()
         updateStatus()
         let m = model.focusedMonitor.id
