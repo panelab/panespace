@@ -569,10 +569,10 @@ final class WorkspaceTests: XCTestCase {
         m.run("[app=\"Notes\"] zoom enable")
         m.run("[app=\"Notes\"] pin enable")
         if m.windows[2]?.workspace == nil {  // still hidden
-            XCTAssertNil(ws.fullscreen)
+            XCTAssertNil(m.focusedWorkspace.fullscreen)
             XCTAssertEqual(m.windows[2]?.isPinned, false)
         }
-        XCTAssertFalse(ws.fullscreen === m.windows[2] && m.windows[2]?.workspace !== ws)
+        XCTAssertFalse(m.focusedWorkspace.fullscreen === m.windows[2] && m.windows[2]?.workspace !== m.focusedWorkspace)
     }
 
     func testCriteriaFocusJumpsWorkspaces() {
@@ -983,6 +983,13 @@ final class ParserTests: XCTestCase {
         func c(_ s: String) throws -> Command { try CommandParser.parse(s)[0].command }
         XCTAssertEqual(try c("move container to workspace number 3"), .moveToWorkspace(.number("3")))
         XCTAssertEqual(try c("move workspace to output left"), .moveWorkspaceToOutput(.direction(.left)))
+        XCTAssertEqual(try c("move workspace output next"), .moveWorkspaceToOutput(.next))
+        // Names with "to" / "output" in them stay names.
+        XCTAssertEqual(try c("move container to workspace to do"), .moveToWorkspace(.name("to do")))
+        XCTAssertEqual(try c("workspace number 2 output next"), .workspaceOnOutput(.number("2"), .next))
+        XCTAssertEqual(try c("workspace Audio output stuff"), .workspace(.name("Audio output stuff"), noAutoBackAndForth: false))
+        XCTAssertTrue(Config.parse("bindcode $mod+38 focus left").warnings.contains { $0.contains("macOS key codes") })
+        XCTAssertTrue(Config.parse("bindsym $mod+a focus left").warnings.isEmpty)
         XCTAssertEqual(try c("move left 20 px"), .move(.left, px: 20))
         XCTAssertEqual(try c("resize grow width 10 px or 5 ppt"),
                        .resize(ResizeArg(grow: true, dimension: .width, px: 10, ppt: 5)))

@@ -2,7 +2,15 @@ import Foundation
 
 /// Unix-socket IPC, i3-msg style. Request: "<type>\n<payload>"; response: JSON.
 public enum IPC {
-    public static var socketPath: String { "/tmp/panespace-\(getuid()).sock" }
+    /// In the per-user temporary directory (only this user can create files there), not shared /tmp, where
+    /// another account could take the name first.
+    public static let socketPath: String = {
+        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+        let dir = confstr(_CS_DARWIN_USER_TEMP_DIR, &buf, buf.count) > 0 ? String(cString: buf) : NSTemporaryDirectory()
+        return (dir.hasSuffix("/") ? dir : dir + "/") + "panespace.sock"
+    }()
+    /// Where versions before 0.2 listened: still tried by `send`, so a CLI can reach (and stop) an older daemon.
+    static var legacySocketPath: String { "/tmp/panespace-\(getuid()).sock" }
 
     private static func withAddress<T>(_ path: String, _ body: (UnsafePointer<sockaddr>, socklen_t) -> T) -> T {
         var addr = sockaddr_un()
@@ -51,11 +59,15 @@ public enum IPC {
 
     /// Returns nil when no daemon is listening.
     public static func send(type: String, payload: String) -> String? {
+        send(type: type, payload: payload, to: socketPath) ?? send(type: type, payload: payload, to: legacySocketPath)
+    }
+
+    private static func send(type: String, payload: String, to path: String) -> String? {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return nil }
         defer { close(fd) }
         configure(fd, timeout: 15)  // a busy daemon can take a while; a wedged one mustn't hang the CLI forever
-        guard withAddress(socketPath, { connect(fd, $0, $1) }) == 0 else { return nil }
+        guard withAddress(path, { connect(fd, $0, $1) }) == 0 else { return nil }
         writeAll(fd, Data("\(type)\n\(payload)".utf8))
         shutdown(fd, SHUT_WR)
         return String(decoding: readAll(fd), as: UTF8.self)

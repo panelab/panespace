@@ -30,6 +30,7 @@ enum Focus {
     /// `current`: still wanted. Checked before the steps that can wait on a busy app, so a focus that was
     /// overtaken by a newer one never lands after it.
     static func focus(pid: pid_t, windowID: CGWindowID, element: AXUIElement, current: () -> Bool = { true }) {
+        guard current() else { return }  // overtaken while queued
         var t = DispatchTime.now().uptimeNanoseconds
         var psn = ProcessSerialNumber()
         var madeKey = false

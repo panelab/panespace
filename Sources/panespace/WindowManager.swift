@@ -377,6 +377,8 @@ final class WindowManager {
         unlink(IPC.socketPath)
     }
     private var cleanedUp = false
+    /// Focus jobs that run beside an animation: serial, so an older one can never land after a newer one.
+    private static let focusQueue = DispatchQueue(label: "panespace.focus", qos: .userInteractive)
 
     /// Puts every window we parked off-screen back where the user can reach it.
     func restoreAllWindows() {
@@ -558,6 +560,7 @@ final class WindowManager {
                         floatingModifier: model.config.floatingModifier, capsLock: caps,
                         interceptFullscreen: model.config.interceptNativeFullscreen,
                         oneShot: model.config.oneShotModes.contains(model.mode),
+                        defaults: model.config.modes["default"] ?? [:],
                         scrollWorkspaces: model.config.workspaceScroll)
         updateTrackpad()
         updateStatus()
@@ -1831,7 +1834,7 @@ final class WindowManager {
                 }
                 // While gliding, focus alongside the first frames: keys go to the new window now, and the
                 // animation doesn't wait for the focus change to start.
-                if !moves.isEmpty { DispatchQueue.global(qos: .userInteractive).async(execute: focus) }
+                if !moves.isEmpty { WindowManager.focusQueue.async(execute: focus) }
                 var written = WindowManager.write(show, monitors: monitors)
                 let shownAt = CACurrentMediaTime()
                 // Park the old workspace only once the new one is really on screen; otherwise apps that are slow

@@ -36,6 +36,8 @@ final class EventTap {
     private var fnDownAt = 0.0
     private var fnUsed = true
     private var capsLock = false
+    /// The default mode's bindings, to switch to the moment a one-shot mode's key is pressed (main catches up later).
+    private var defaultBindings: [KeyCombo: String] = [:]
     private var interceptFullscreen = true
     private var dragButton: CGMouseButton?
     private var dragPoint = CGPoint.zero
@@ -61,8 +63,10 @@ final class EventTap {
     var click: Click { lock.withLock { _click } }
 
     func setBindings(_ b: [KeyCombo: String], trackMouseMoves: Bool, floatingModifier: Modifiers?, capsLock: Bool,
-                     interceptFullscreen: Bool, oneShot: Bool = false, scrollWorkspaces: Bool = false) {
+                     interceptFullscreen: Bool, oneShot: Bool = false, scrollWorkspaces: Bool = false,
+                     defaults: [KeyCombo: String]? = nil) {
         lock.withLock {
+            defaultBindings = defaults ?? b
             scrollModifier = scrollWorkspaces ? floatingModifier : nil
             self.oneShot = oneShot
             self.interceptFullscreen = interceptFullscreen
@@ -153,7 +157,11 @@ final class EventTap {
 
     /// The key pressed in a one-shot mode: leave the mode, then run its command (none: just leave).
     private func oneShotKey(_ cmd: String?) {
-        lock.withLock { oneShot = false }  // a fast second key goes to the default bindings
+        // A fast second key goes to the default bindings, even before main has run "mode default".
+        lock.withLock {
+            oneShot = false
+            bindings = defaultBindings
+        }
         let run = cmd.map { "mode default; " + $0 } ?? "mode default"
         let t = CACurrentMediaTime()
         DispatchQueue.main.async { self.onCommand(run, t) }

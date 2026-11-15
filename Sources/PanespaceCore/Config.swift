@@ -167,6 +167,7 @@ public struct Config {
             pending = ""
         }
 
+        var warnedBindcode = false
         for (lineNo, rawLine) in lines {
             var line = Config.stripTrailingComment(rawLine).trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("#") { continue }
@@ -211,6 +212,11 @@ public struct Config {
                 let command = CommandParser.rest(rest)
                 guard let combo = KeyCombo.parse(keySpec, isCode: first == "bindcode") else {
                     warn("unknown key '\(keySpec)'"); continue
+                }
+                if first == "bindcode", !warnedBindcode {
+                    // i3 configs use X11 keycodes (38 = a); these are macOS virtual key codes (38 = j).
+                    warnedBindcode = true
+                    warn("bindcode takes macOS key codes, not X11/Linux ones: prefer bindsym (it follows the keyboard layout)")
                 }
                 guard !command.isEmpty else { warn("binding '\(keySpec)' has no command"); continue }
                 if release { warn("--release is not supported; binding fires on press") }
