@@ -15,7 +15,7 @@ final class DropPreview {
         window.ignoresMouseEvents = true
         window.isReleasedWhenClosed = false
         window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]  // never over a full-screen video
         window.alphaValue = 0
         let view = NSView()
         view.wantsLayer = true

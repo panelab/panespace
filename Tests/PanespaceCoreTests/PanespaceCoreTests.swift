@@ -549,6 +549,32 @@ final class WorkspaceTests: XCTestCase {
         XCTAssertEqual(m.windows[2]?.workspace?.name, "7")
     }
 
+    /// A window floated before its workspace was ever shown has no laid-out frame: it must not become 0×0.
+    func testFloatingAWindowNeverLaidOutGetsARealFrame() {
+        m.addWindow(1, info: WindowInfo(app: "A"), floating: false, frame: nil, workspaceName: "3")
+        XCTAssertNotEqual(m.focusedWorkspace.name, "3")
+        run("[app=\"A\"] floating enable")
+        let f = m.windows[1]?.floatingFrame
+        XCTAssertNotNil(f)
+        XCTAssertGreaterThan(f?.width ?? 0, 0)
+        XCTAssertGreaterThan(f?.height ?? 0, 0)
+    }
+
+    /// Zoom (and pin) on a window hidden in the scratchpad must not zoom it over the focused workspace.
+    func testZoomAndPinIgnoreAHiddenScratchpadWindow() {
+        add(1)
+        add(2, app: "Notes")
+        run("move scratchpad")
+        XCTAssertEqual(m.placements()[2], .hidden(1))
+        m.run("[app=\"Notes\"] zoom enable")
+        m.run("[app=\"Notes\"] pin enable")
+        if m.windows[2]?.workspace == nil {  // still hidden
+            XCTAssertNil(m.focusedWorkspace.fullscreen)
+            XCTAssertEqual(m.windows[2]?.isPinned, false)
+        }
+        XCTAssertFalse(m.focusedWorkspace.fullscreen === m.windows[2] && m.windows[2]?.workspace !== m.focusedWorkspace)
+    }
+
     func testCriteriaFocusJumpsWorkspaces() {
         add(1, app: "Safari")
         run("workspace 2")
@@ -588,6 +614,24 @@ final class MultiMonitorTests: XCTestCase {
     func add(_ id: WindowID, at x: CGFloat) {
         m.addWindow(id, info: WindowInfo(app: "A"), floating: false,
                     frame: CGRect(x: x, y: 10, width: 100, height: 100), useMonitorOfFrame: true)
+    }
+
+    /// A container moved onto an empty display is dissolved into that workspace's root: focus must land on a
+    /// window it held, not on the detached, empty container.
+    func testMovingAContainerOntoAnEmptyDisplayKeepsAWindowFocused() {
+        add(1, at: 10)
+        add(2, at: 10)
+        m.osFocused(2)
+        m.run("split v")
+        add(3, at: 10)
+        m.osFocused(3)
+        m.run("focus parent")
+        m.run("move right")
+        XCTAssertEqual(m.focusedWorkspace.name, "2")
+        XCTAssertNotNil(m.focusedWindow)
+        if let f = m.focusedWindow { XCTAssertTrue(f.workspace === m.focusedWorkspace) }
+        // Moving again acts on something real (it would silently do nothing on a detached container).
+        XCTAssertTrue(m.run("move left").ok)
     }
 
     func testStartupPlacementAndCrossMonitorFocus() {
@@ -939,6 +983,13 @@ final class ParserTests: XCTestCase {
         func c(_ s: String) throws -> Command { try CommandParser.parse(s)[0].command }
         XCTAssertEqual(try c("move container to workspace number 3"), .moveToWorkspace(.number("3")))
         XCTAssertEqual(try c("move workspace to output left"), .moveWorkspaceToOutput(.direction(.left)))
+        XCTAssertEqual(try c("move workspace output next"), .moveWorkspaceToOutput(.next))
+        // Names with "to" / "output" in them stay names.
+        XCTAssertEqual(try c("move container to workspace to do"), .moveToWorkspace(.name("to do")))
+        XCTAssertEqual(try c("workspace number 2 output next"), .workspaceOnOutput(.number("2"), .next))
+        XCTAssertEqual(try c("workspace Audio output stuff"), .workspace(.name("Audio output stuff"), noAutoBackAndForth: false))
+        XCTAssertTrue(Config.parse("set $mod alt\nbindcode $mod+38 focus left").warnings.contains { $0.contains("macOS key codes") })
+        XCTAssertTrue(Config.parse("set $mod alt\nbindsym $mod+a focus left").warnings.isEmpty)
         XCTAssertEqual(try c("move left 20 px"), .move(.left, px: 20))
         XCTAssertEqual(try c("resize grow width 10 px or 5 ppt"),
                        .resize(ResizeArg(grow: true, dimension: .width, px: 10, ppt: 5)))

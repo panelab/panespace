@@ -106,6 +106,8 @@ final class Stats {
         var list: thread_act_array_t?
         var count = mach_msg_type_number_t(0)
         guard task_threads(mach_task_self_, &list, &count) == KERN_SUCCESS, let list else { return 0 }
+        // Each entry is a send right of ours: give them back, or polling `stats` leaks ports.
+        for i in 0..<Int(count) { mach_port_deallocate(mach_task_self_, list[i]) }
         vm_deallocate(mach_task_self_, vm_address_t(bitPattern: list), vm_size_t(Int(count) * MemoryLayout<thread_t>.stride))
         return Int(count)
     }

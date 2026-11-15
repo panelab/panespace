@@ -112,6 +112,11 @@ final class StatusBar: NSObject, NSMenuDelegate {
         menu.addItem(settingsItem(manager))
         menu.addItem(.separator())
         menu.addItem(menuItem("About Panespace", #selector(about), symbol: "info.circle"))
+        if Updater.shared.isAvailable {
+            let check = menuItem("Check for Updates…", #selector(checkForUpdates), symbol: "arrow.down.circle")
+            check.isEnabled = Updater.shared.canCheck
+            menu.addItem(check)
+        }
         menu.addItem(menuItem("Quit Panespace", #selector(quit), shortcut: "exit", symbol: "power"))
     }
 
@@ -182,6 +187,11 @@ final class StatusBar: NSObject, NSMenuDelegate {
         let login = menuItem("Open at Login", #selector(toggleLogin))
         login.state = LoginItem.isEnabled ? .on : .off
         sub.addItem(login)
+        if Updater.shared.isAvailable {
+            let auto = menuItem("Check for Updates Automatically", #selector(toggleAutoUpdates))
+            auto.state = Updater.shared.automaticallyChecks ? .on : .off
+            sub.addItem(auto)
+        }
         sub.addItem(.separator())
         sub.addItem(choices("Modifier Key", key: "set $mod", current: configValue("set $mod"), StatusBar.modifiers))
         sub.addItem(choices("Swipe Fingers", key: "gesture_fingers", current: String(model.config.gestureFingers),
@@ -331,11 +341,17 @@ final class StatusBar: NSObject, NSMenuDelegate {
         do { try LoginItem.set(!LoginItem.isEnabled) } catch { alert("Couldn't change Open at Login", error.localizedDescription) }
     }
 
+    @objc private func checkForUpdates() { Updater.shared.checkForUpdates() }
+
+    @objc private func toggleAutoUpdates() {
+        Updater.shared.automaticallyChecks.toggle()
+    }
+
     @objc private func about() {
         let center = NSMutableParagraphStyle()
         center.alignment = .center
-        let repo = "https://github.com/broisnischal/panespace"
-        let credits = NSAttributedString(string: "github.com/broisnischal/panespace", attributes: [
+        let repo = "https://github.com/panelab/panespace"
+        let credits = NSAttributedString(string: "github.com/panelab/panespace", attributes: [
             .link: URL(string: repo)!, .paragraphStyle: center, .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
         ])
         NSApp.activate(ignoringOtherApps: true)

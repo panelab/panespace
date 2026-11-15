@@ -43,7 +43,7 @@ enum Specials {
                 keepAwake = nil
                 log("keep-awake off")
             } else {
-                keepAwake = run("/usr/bin/caffeinate", ["-di"])
+                keepAwake = run("/usr/bin/caffeinate", ["-di", "-w", String(getpid())])  // ends with Caps, even on a crash
                 log("keep-awake on")
             }
 

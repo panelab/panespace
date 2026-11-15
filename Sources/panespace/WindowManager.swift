@@ -133,6 +133,12 @@ final class WindowManager {
     private var focusChangePending = Set<pid_t>()
     /// A window the switcher asked back from minimized/hidden: focused as soon as it's in the layout again.
     private var focusWhenBack: (id: WindowID, until: Date)?
+    /// Windows in macOS full screen that Panespace had in the layout: listed in the switcher (picking one goes to
+    /// its Space) and focused again when they come back to their tile.
+    private var fullscreenAway: [WindowID: (info: WindowInfo, el: AXUIElement, pid: pid_t)] = [:]
+    /// Until then, a window is on its way into macOS full screen: the Space hasn't switched yet, so
+    /// `Spaces.summary()` still says desktop, but focusing anything now would yank the user back out of it.
+    private var fullscreenGuardUntil = Date.distantPast
     /// New windows already seen listed-but-not-shown once (re-checked once, not on every sweep).
     private var offscreenSeen = Set<WindowID>()
     /// When a window last left the screen (closed, minimized, app hidden or quit). macOS then hands focus to
@@ -187,6 +193,19 @@ final class WindowManager {
     private var fullscreenSkipped = Set<WindowID>()
     /// Until then, macOS is sliding between Spaces: window moves are its animation, not the app's.
     private var spaceSettleUntil = Date.distantPast
+
+    /// The user is in (or sliding into) a macOS full-screen Space: a video, a game, a player. Focusing a desktop
+    /// window, or Panespace itself, from there would pull them out of it or take the keyboard away from it.
+    /// Cheap: the Spaces summary as of the last space change. `inFullscreenSpaceNow` asks the window server.
+    private var inFullscreenSpace: Bool { Date() < fullscreenGuardUntil || spaces.activeIsFullscreen }
+    private var inFullscreenSpaceNow: Bool { inFullscreenSpace || Spaces.summary().activeIsFullscreen }
+
+    private func guardFullscreenTransition() {
+        fullscreenGuardUntil = max(fullscreenGuardUntil, Date().addingTimeInterval(1.5))
+        border.hide()
+        // The guard hides the border; bring it back once it's over, wherever focus ended up.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.55) { [weak self] in self?.updateBorder() }
+    }
     /// The layout being applied comes from the user's own command (not an app or macOS event).
     private var userAsked = false
     /// The keyboard is on a window Panespace doesn't manage (picture-in-picture, an overlay, the desktop), so
@@ -342,13 +361,24 @@ final class WindowManager {
     }
 
     func shutdown() {
-        saveSession()
-        chrome.restore()
-        CapsLock.disable()
-        restoreAllWindows()
-        unlink(IPC.socketPath)
+        cleanup()
         exit(0)
     }
+
+    /// Everything quitting must undo, however it quits (menu, signal, logout, an update relaunching it).
+    /// Windows first: if launchd runs out of patience, the parked windows matter most.
+    func cleanup() {
+        guard !cleanedUp else { return }
+        cleanedUp = true
+        saveSession()
+        restoreAllWindows()
+        CapsLock.disable()
+        chrome.restore()
+        unlink(IPC.socketPath)
+    }
+    private var cleanedUp = false
+    /// Focus jobs that run beside an animation: serial, so an older one can never land after a newer one.
+    private static let focusQueue = DispatchQueue(label: "panespace.focus", qos: .userInteractive)
 
     /// Puts every window we parked off-screen back where the user can reach it.
     func restoreAllWindows() {
@@ -389,6 +419,9 @@ final class WindowManager {
         if !server.isEmpty {
             fullscreenSkipped.formIntersection(server)
             nativeFullscreen.formIntersection(server)
+            fullscreenOnReturn.formIntersection(server)
+            // Back in the layout some other way, or closed: no longer one to offer in the switcher.
+            fullscreenAway = fullscreenAway.filter { server.contains($0.key) && !live.contains($0.key) }
             parked = parked.filter { server.contains($0.key) && $0.value.until > Date() }
         }
         if debug {
@@ -527,7 +560,8 @@ final class WindowManager {
                         floatingModifier: model.config.floatingModifier, capsLock: caps,
                         interceptFullscreen: model.config.interceptNativeFullscreen,
                         oneShot: model.config.oneShotModes.contains(model.mode),
-                        scrollWorkspaces: model.config.workspaceScroll)
+                        scrollWorkspaces: model.config.workspaceScroll,
+                        defaults: model.config.modes["default"] ?? [:])
         updateTrackpad()
         updateStatus()
         let m = model.focusedMonitor.id
@@ -548,9 +582,13 @@ final class WindowManager {
         if startup { commandedDuringStartup = true }
         commandAt = keyAt ?? CACurrentMediaTime()
         defer { commandAt = nil }
-        userAsked = true  // a key, the menu or the CLI: allowed to take the user out of a full-screen Space
+        // A key, the menu or the CLI: allowed to take the user out of a full-screen Space, but only by changing
+        // where focus goes (a workspace, another window). The leader key, a mode, a toggle: stay in the video.
+        let fullscreenBefore = inFullscreenSpaceNow
+        let targetBefore = (model.focusedWindow?.id, model.focusedWorkspace.name)
+        userAsked = true
         defer { userAsked = false }
-        if focusOutside {
+        if focusOutside, !fullscreenBefore {
             // e.g. a click on a PiP window, then alt+N for the workspace already shown: bring the keyboard back.
             focusOutside = false
             lastFocused = nil
@@ -567,6 +605,16 @@ final class WindowManager {
         }
         let modeBefore = model.mode
         let r = timed("model.run '\(text)'") { model.run(text) }
+        if fullscreenBefore {
+            if targetBefore != (model.focusedWindow?.id, model.focusedWorkspace.name) {
+                focusOutside = false
+                lastFocused = nil
+                pendingFocus = nil
+                focusHolder.release()
+            } else {
+                userAsked = false
+            }
+        }
         perform(r.effects)
         if model.mode != modeBefore { applyBindings() }
         if !r.ok { log("command '\(text)': \(r.errors.joined(separator: "; "))") }
@@ -597,6 +645,10 @@ final class WindowManager {
     /// the layout doesn't hold it, so the model's focused window is some other one.
     private func nativeFullscreen(_ id: WindowID?, _ t: Toggle) {
         let target = id.flatMap { elements[$0] }
+        // Only on the way in: leaving must let focus and the border come back right away.
+        if (t == .enable && target != nil) || (t == .toggle && !inFullscreenSpaceNow && target != nil) {
+            guardFullscreenTransition()
+        }
         let frontPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
         axQueue.async {
             if t != .enable, let pid = frontPid, let front = AXUIElement.app(pid).focusedWindow, front.isFullScreen {
@@ -620,10 +672,29 @@ final class WindowManager {
             SwitcherEntry(id: id, app: a.info.app, bundleID: a.info.bundleID, pid: a.pid, title: a.info.title,
                           workspace: a.workspace, isFloating: false, isAway: true)
         }
-        switcher.show(model.switcherEntries() + aside, on: screen.visibleFrame) { [weak self] id in
+        let fullscreen = fullscreenAway.sorted { $0.key < $1.key }.map { id, f in
+            SwitcherEntry(id: id, app: f.info.app, bundleID: f.info.bundleID, pid: f.pid, title: f.info.title,
+                          workspace: nil, isFloating: false, isAway: true, isFullScreen: true)
+        }
+        let frontPid = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let fromFullscreen = inFullscreenSpaceNow
+        switcher.show(fullscreen + model.switcherEntries() + aside, on: screen.visibleFrame) { [weak self] id in
             guard let self else { return }
+            if id == nil, fromFullscreen, let pid = frontPid, pid != getpid() {
+                // Opened over a full-screen video and dismissed: give the keyboard back to it, don't leave its Space.
+                NSRunningApplication(processIdentifier: pid)?.activate()
+                return
+            }
             userAsked = true
             defer { userAsked = false }
+            if let id, let f = fullscreenAway[id] {
+                // On its own Space: focusing it makes macOS slide there. Nothing else may take focus meanwhile.
+                guardFullscreenTransition()
+                lastFocused = nil
+                pendingFocus = nil
+                _ = focusGeneration.increment()
+                return axQueue.async { Focus.focus(pid: f.pid, windowID: id, element: f.el) }
+            }
             if let id, let a = away[id] { return bringBack(id, a.el, pid: a.pid) }
             if let id, model.windows[id] != nil { model.osFocused(id) }
             lastFocused = nil  // the switcher had the keyboard: always focus again
@@ -754,7 +825,10 @@ final class WindowManager {
         guard let w = model.windows[id], modDrag == nil else { return }
         // Going into macOS full screen (a video, a music player, a game): never fight the transition. A scan of
         // its app sets the window aside like a minimized one; it comes back to its tile when it leaves.
-        if fullScreen { return requestSync(.apps([pid])) }
+        if fullScreen {
+            guardFullscreenTransition()
+            return requestSync(.apps([pid]))
+        }
         // Our own animation frames, and their stragglers.
         if animating.contains(id) || (settling[id].map { Date() < $0 } ?? false) { return }
         let click = tap.click
@@ -890,6 +964,9 @@ final class WindowManager {
                 // is on screen, go to where they are, like Cmd-Tab to an app on another macOS Space.
                 guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else { return }
                 self.focusOutside = true
+                // A full-screen app (a video between frames, a player's controls) often reports no focused window:
+                // that's not a reason to go looking for its other windows on the desktop.
+                if self.inFullscreenSpace { return }
                 guard Date().timeIntervalSince(self.windowLostAt) > 0.8 else { return }
                 let mine = self.model.windows.values.filter { $0.info.pid == pid }
                 // Every window of it minimized, and the user switched to it (Cmd-Tab, a click on its Dock icon):
@@ -945,6 +1022,7 @@ final class WindowManager {
     /// Panespace when the workspace is empty, so typing never lands in a window the user can't see.
     private func keepFocus() {
         if debug { log("focus: ignoring macOS's stand-in focus on another workspace") }
+        if inFullscreenSpace { return }  // the full-screen window has the keyboard; leave it there
         if model.focusedWindow == nil {
             lastFocused = nil
             focusHolder.take(model.focusedMonitor.id)
@@ -1010,6 +1088,8 @@ final class WindowManager {
     private func mouseMoved(_ p: CGPoint) {
         guard model.config.focusFollowsMouse, !tap.isMouseDown, Date().timeIntervalSince(lastMouseMove) > 0.05 else { return }
         lastMouseMove = Date()
+        // Over a full-screen video the tiles underneath aren't there to hover.
+        if spaces.activeIsFullscreen || Date() < fullscreenGuardUntil { return }
         guard let w = model.window(at: p), w.id != model.focusedWindow?.id else { return }
         // Only between tiles: focusing raises the window, so hovering in and out of a floating window would
         // flip it above and below the tile under it. Floating windows take focus on click.
@@ -1193,6 +1273,8 @@ final class WindowManager {
     private struct SyncResult {
         var seen: [WindowID: Seen] = [:]
         var minimized = Set<WindowID>()
+        /// In macOS full screen (on their own Space).
+        var fullscreen = Set<WindowID>()
         /// Minimized windows not seen before (minimized before Panespace started): listed in the switcher.
         var minimizedNew: [WindowID: (el: AXUIElement, info: WindowInfo)] = [:]
         var hiddenPids = Set<pid_t>()
@@ -1285,6 +1367,7 @@ final class WindowManager {
                 let bundle = app.bundleIdentifier ?? ""
                 var local: [WindowID: Seen] = [:]
                 var localMinimized: [WindowID] = []
+                var localFullscreen: [WindowID] = []
                 var localMinimizedNew: [WindowID: (el: AXUIElement, info: WindowInfo)] = [:]
                 var listed: [(el: AXUIElement, id: WindowID)] = []
                 for w in windows {
@@ -1294,9 +1377,13 @@ final class WindowManager {
                     // Only for windows not yet in the layout: one being minimized is still on screen for the length
                     // of the animation, and must leave the layout right away.
                     let minimized = w.isMinimized && (known[id] != nil || server[id]?.onscreen != true)
-                    if minimized || w.isFullScreen {  // full screen: on its own Space, outside the layout
+                    if !minimized, w.isFullScreen {  // on its own Space, outside the layout
+                        localFullscreen.append(id)
+                        continue
+                    }
+                    if minimized {
                         localMinimized.append(id)
-                        if minimized, known[id] == nil, !knownAway.contains(id) {
+                        if known[id] == nil, !knownAway.contains(id) {
                             localMinimizedNew[id] = (w, WindowInfo(app: name, bundleID: bundle, title: w.title, pid: pid))
                         }
                         continue
@@ -1337,6 +1424,7 @@ final class WindowManager {
                 lock.withLock {
                     result.seen.merge(local) { a, _ in a }
                     result.minimized.formUnion(localMinimized)
+                    result.fullscreen.formUnion(localFullscreen)
                     result.minimizedNew.merge(localMinimizedNew) { a, _ in a }
                     result.tabs.merge(localTabs) { a, _ in a }
                     for id in localOffscreen { result.offscreen[id] = pid }
@@ -1386,13 +1474,25 @@ final class WindowManager {
             // Gone from its app's list and either unknown to the window server or still on screen
             // (playing its close animation): closed. Off screen means another Space: wait (below).
             let gone = r.goneApps.contains(pid) || r.server.map { $0[id] ?? true } ?? false
-            if gone {
+            // Still in its app's list, so not closed, though on screen: going into full screen (the user is on, or
+            // sliding to, its Space) or being minimized (the Dock animation). Checked before `gone`.
+            if !r.goneApps.contains(pid), r.fullscreen.contains(id) {
+                // Gone into macOS full screen (a video, a game): out of the layout until it leaves, then back in
+                // its tile with the focus. Not "minimized": the switcher goes to it rather than restoring it.
+                enteredFullscreen(id, pid: pid)
+            } else if !r.goneApps.contains(pid), r.minimized.contains(id) {
+                if let w = model.windows[id], let el = elements[id] {
+                    away[id] = (w.info, el, pid, w.workspace?.name ?? model.focusedWorkspace.name, Date())
+                }
+                park(id)
+                forget(id)
+            } else if gone {
                 // The window server still has it (closing, or the app answered with an empty list after a
                 // lock or wake): remember its workspace for when it's listed again; dropped once the server
                 // forgets the ID. Unknown to the server: really closed, nothing to remember (IDs get reused).
                 if r.server?[id] != nil { park(id) }
                 forget(id)
-            } else if r.minimized.contains(id) || r.hiddenPids.contains(pid) {
+            } else if r.hiddenPids.contains(pid) {
                 if let w = model.windows[id], let el = elements[id] {
                     away[id] = (w.info, el, pid, w.workspace?.name ?? model.focusedWorkspace.name, Date())
                 }
@@ -1410,6 +1510,7 @@ final class WindowManager {
         if let s = r.server {
             for id in parked.keys where s[id] == nil { parked[id] = nil }
             for id in away.keys where s[id] == nil { away[id] = nil }  // closed while minimized
+            for id in fullscreenAway.keys where s[id] == nil { fullscreenAway[id] = nil }  // closed in full screen
         }
 
         // Restored windows keep their saved order; new ones follow by ID.
@@ -1429,10 +1530,14 @@ final class WindowManager {
             // (WebKit puts a fullscreen video in one, then takes it into macOS full screen). Tiling it would break
             // that, so leave it alone; if it ever shrinks to a normal window, a later scan picks it up.
             if let f = s.frame, coversDisplay(f) {
+                // On its way out of macOS full screen (still at full size): not the app's own full screen. Wait for
+                // a later look instead of leaving it alone for good.
+                if fullscreenAway[id] != nil { continue }
                 if fullscreenSkipped.insert(id).inserted { log("full screen: leaving \(info.app)'s full-screen window alone") }
                 continue
             }
             away[id] = nil
+            fullscreenAway[id] = nil
             if let p = parked.removeValue(forKey: id), Date() < p.until {
                 model.addWindow(id, info: info, floating: p.floating, frame: nil, workspaceName: p.workspace,
                                 near: p.spot?.neighbor, before: p.spot?.before ?? false)
@@ -1678,7 +1783,7 @@ final class WindowManager {
         if let f = model.focusedWindow {
             let on = model.focusedMonitor.id
             if f.id != lastFocused || on != lastFocusedOn, let el = elements[f.id], let pid = pids[f.id],
-               userAsked || !Spaces.summary().activeIsFullscreen {
+               userAsked || !inFullscreenSpaceNow {
                 focusHolder.release()
                 lastFocused = f.id
                 lastFocusedOn = on
@@ -1688,7 +1793,7 @@ final class WindowManager {
                 focusOutside = false
             }
         } else if lastFocused != nil || focusHolder.monitor != model.focusedMonitor.id,
-                  userAsked || !Spaces.summary().activeIsFullscreen {
+                  userAsked || !inFullscreenSpaceNow {
             // Empty workspace: take keyboard focus away from windows that are now parked off-screen, and bring the
             // menu bar to this display (also when moving from one empty display to another).
             lastFocused = nil
@@ -1729,7 +1834,7 @@ final class WindowManager {
                 }
                 // While gliding, focus alongside the first frames: keys go to the new window now, and the
                 // animation doesn't wait for the focus change to start.
-                if !moves.isEmpty { DispatchQueue.global(qos: .userInteractive).async(execute: focus) }
+                if !moves.isEmpty { WindowManager.focusQueue.async(execute: focus) }
                 var written = WindowManager.write(show, monitors: monitors)
                 let shownAt = CACurrentMediaTime()
                 // Park the old workspace only once the new one is really on screen; otherwise apps that are slow
@@ -1798,6 +1903,7 @@ final class WindowManager {
     private func updateTrackpad(restart: Bool = false) {
         let c = model.config
         if !c.gestures || restart || trackpad?.fingers != c.gestureFingers {
+            if swipe != nil { swipeEnded(velocity: 0) }  // its end event will never come now
             trackpad?.stop()
             trackpad = nil
         }
@@ -2050,12 +2156,13 @@ final class WindowManager {
     private func updateBorder() {
         let c = model.config
         guard c.borderWidth > 0, let f = model.focusedWindow, model.focusedWorkspace.fullscreen !== f,
-              !tap.isMouseDown, modDrag == nil, let el = elements[f.id] else { return border.hide() }
+              !tap.isMouseDown, modDrag == nil, !spaces.activeIsFullscreen, Date() >= fullscreenGuardUntil,
+              let el = elements[f.id] else { return border.hide() }
         let (id, width, radius, color) = (f.id, c.borderWidth, c.borderRadius, c.borderColor)
         axQueue.async { [weak self] in  // after the queued moves, so we read the final frame
             let frame = el.frame
             DispatchQueue.main.async {
-                guard let self, let frame, self.model.focusedWindow?.id == id else { return }
+                guard let self, let frame, self.model.focusedWindow?.id == id, !self.spaces.activeIsFullscreen else { return }
                 self.border.show(around: frame, width: width, radius: radius, color: color)
             }
         }
@@ -2091,8 +2198,10 @@ final class WindowManager {
         }
         defer {
             if s != spaces {
+                let wasFullscreen = spaces.activeIsFullscreen
                 spaces = s
                 updateStatus()
+                if wasFullscreen != s.activeIsFullscreen { updateBorder() }
             }
         }
         // A window went into macOS full screen. Apps do that for videos and games, and that's theirs to keep:
@@ -2100,17 +2209,31 @@ final class WindowManager {
         // Only a click on the green button just before becomes Panespace's zoom instead, so it stays tiled.
         let now = Set(s.fullscreenWindows.map(\.window))
         if now != nativeFullscreen {
-            let left = !nativeFullscreen.subtracting(now).isEmpty
+            let left = nativeFullscreen.subtracting(now)
             nativeFullscreen = now
-            if left { requestSync(.all) }  // back on the desktop: into the layout right away
+            if !left.isEmpty {
+                // Out of full screen: back in its tile, and with the keyboard, as macOS gives it (a neighbour
+                // would otherwise take it, since the model moved on while it was away).
+                if let id = left.first(where: { fullscreenAway[$0] != nil && parked[$0] != nil }) {
+                    focusWhenBack = (id, Date().addingTimeInterval(3))
+                }
+                requestSync(.all)  // back on the desktop: into the layout right away
+                // The first look can land mid-animation (still full screen, or still covering the display), and
+                // nothing announces the end of it: look again a few times, like after an app launch.
+                let apps = Set(left.compactMap { fullscreenAway[$0]?.pid })
+                if !apps.isEmpty {
+                    for d in [0.5, 1.0, 2.0] {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + d) { [weak self] in self?.requestSync(.apps(apps)) }
+                    }
+                }
+            }
         }
         for fs in s.fullscreenWindows where !pullingBack.contains(fs.window) {
             if model.config.interceptNativeFullscreen, let g = greenButton, g.id == fs.window, Date().timeIntervalSince(g.at) < 3 {
                 greenButton = nil
                 pullBack(fs)
             } else if model.windows[fs.window] != nil {
-                park(fs.window)
-                forget(fs.window)
+                enteredFullscreen(fs.window, pid: fs.pid)
                 scheduleApply()
             }
         }
@@ -2118,6 +2241,14 @@ final class WindowManager {
             warnedAboutDesktops = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.showDesktopsAlert() }
         }
+    }
+
+    /// A tiled (or floating) window went into macOS full screen: it leaves the layout until it comes back.
+    private func enteredFullscreen(_ id: WindowID, pid: pid_t) {
+        guardFullscreenTransition()
+        if let w = model.windows[id], let el = elements[id] { fullscreenAway[id] = (w.info, el, pid) }
+        park(id)
+        forget(id)
     }
 
     private var pullingBack = Set<CGWindowID>()

@@ -27,15 +27,24 @@ final class FuzzTests: XCTestCase {
         "move container to workspace number 1", "move container to workspace number 3",
         "move container to workspace number 9", "move scratchpad", "scratchpad show", "kill",
         "mode default", "focus left; move right; split v", "workspace 4; layout tabbed",
+        "zoom toggle", "zoom enable", "pin toggle", "pseudo toggle", "swap workspaces",
+        "[app=\"App1\"] focus", "[app=\"App2\"] floating toggle", "[app=\"App3\"] move container to workspace number 2",
+        "[app=\"App0\"] zoom toggle", "[app=\"App1\"] pin enable", "[app=\"App2\"] layout tabbed",
     ]
 
     func testRandomRunsStayConsistent() {
         for seed in UInt64(1)...25 { run(seed: seed, steps: 600) }
     }
 
-    private func run(seed: UInt64, steps: Int) {
+    /// The config people actually run: auto_split, gaps and the default rules.
+    func testRandomRunsWithTheDefaultConfigStayConsistent() {
+        let c = Config.parse(DefaultConfig.text)
+        for seed in UInt64(101)...115 { run(seed: seed, steps: 600, config: c) }
+    }
+
+    private func run(seed: UInt64, steps: Int, config: Config = Config()) {
         var rng = SplitMix(seed)
-        let m = Model(config: Config(), monitors: [main, ext])
+        let m = Model(config: config, monitors: [main, ext])
         var nextID: WindowID = 1
         var log: [String] = []
         for step in 0..<steps {
@@ -113,12 +122,17 @@ final class FuzzTests: XCTestCase {
             for w in ws.tiledWindows where w.isFloating { return "floating window \(w.id) in the tree" }
             for w in ws.mru where !ws.allWindows.contains(where: { $0 === w }) { return "mru of \(ws.name) has stranger \(w.id)" }
             if let fs = ws.fullscreen, !ws.allWindows.contains(where: { $0 === fs }) { return "fullscreen \(fs.id) not in \(ws.name)" }
+            if let s = ws.selected, s.treeRoot !== ws.root { return "selected container of \(ws.name) isn't in its tree" }
+            for w in ws.floating {
+                if let f = w.floatingFrame, f.width <= 0 || f.height <= 0 { return "floating window \(w.id) has frame \(f)" }
+            }
         }
         for w in m.scratchpad {
             if !placed.insert(w.id).inserted && w.workspace == nil { return "scratchpad window \(w.id) twice" }
         }
         for (id, w) in m.windows {
             if w.id != id { return "window keyed \(id) has id \(w.id)" }
+            if w.isPinned, !w.isFloating || w.workspace == nil { return "pinned window \(id) isn't a floating window on a workspace" }
             if !placed.contains(id) { return "window \(id) is nowhere" }
         }
         let placements = m.placements()

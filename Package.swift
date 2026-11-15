@@ -8,6 +8,10 @@ let package = Package(
         .executable(name: "panespace", targets: ["panespace"]),
         .executable(name: "caps", targets: ["caps"]),
     ],
+    dependencies: [
+        // Auto-updates for Panespace.app, from the appcast attached to each GitHub release.
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.4"),
+    ],
     targets: [
         // Pure window-management logic: tree, layout, config, commands. No AppKit, fully unit-tested.
         .target(name: "PanespaceCore"),
@@ -16,11 +20,13 @@ let package = Package(
         // macOS glue: Accessibility API, event tap, IPC, menu bar.
         .executableTarget(
             name: "panespace",
-            dependencies: ["PanespaceCore", "MacKit"],
+            dependencies: ["PanespaceCore", "MacKit", .product(name: "Sparkle", package: "Sparkle")],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("ApplicationServices"),
                 .linkedFramework("Carbon"),
+                // Sparkle.framework ships in Panespace.app/Contents/Frameworks (see the Makefile's `app`).
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"]),
             ]
         ),
         .testTarget(name: "PanespaceCoreTests", dependencies: ["PanespaceCore"]),

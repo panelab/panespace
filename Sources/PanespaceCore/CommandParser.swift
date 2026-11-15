@@ -241,7 +241,10 @@ public enum CommandParser {
             switch x {
             case "workspace":
                 i += 1
-                if arg(i) == "to" || arg(i) == "output" {
+                // `move workspace to output X` moves the workspace; `move container to workspace to do` moves the
+                // window to a workspace named "to do".
+                let movesWindow = arg(0) == "window" || arg(0) == "container"
+                if !movesWindow, arg(i) == "output" || (arg(i) == "to" && arg(i + 1) == "output") {
                     if arg(i) == "to" { i += 1 }
                     if arg(i) == "output" { i += 1 }
                     return .moveWorkspaceToOutput(try output(Array(a[i...])))
@@ -256,8 +259,15 @@ public enum CommandParser {
             }
 
         case "workspace":
+            // `workspace number 2 output next`: "output" is the keyword only before an output keyword, or after a
+            // number. Unquoted names may contain the word ("Audio output stuff"); quote a name to be sure.
             if let o = a.lastIndex(where: { $0.lowercased() == "output" }), o > 0, o + 1 < a.count {
-                return .workspaceOnOutput(try workspace(Array(a[..<o])).0, try output(Array(a[(o + 1)...])))
+                let target = a[o + 1].lowercased()
+                let keyword = ["next", "prev", "left", "right", "up", "down"].contains(target)
+                let numbered = lower.first == "number" || (o == 1 && Int(a[0]) != nil)
+                if keyword || numbered {
+                    return .workspaceOnOutput(try workspace(Array(a[..<o])).0, try output(Array(a[(o + 1)...])))
+                }
             }
             let (t, noAuto) = try workspace(a)
             return .workspace(t, noAutoBackAndForth: noAuto)

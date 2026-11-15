@@ -2,7 +2,15 @@ import Foundation
 
 /// Unix-socket IPC, i3-msg style. Request: "<type>\n<payload>"; response: JSON.
 public enum IPC {
-    public static var socketPath: String { "/tmp/panespace-\(getuid()).sock" }
+    /// In the per-user temporary directory (only this user can create files there), not shared /tmp, where
+    /// another account could take the name first.
+    public static let socketPath: String = {
+        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+        let dir = confstr(_CS_DARWIN_USER_TEMP_DIR, &buf, buf.count) > 0 ? String(cString: buf) : NSTemporaryDirectory()
+        return (dir.hasSuffix("/") ? dir : dir + "/") + "panespace.sock"
+    }()
+    /// Where versions before 0.2 listened: still tried by `send`, so a CLI can reach (and stop) an older daemon.
+    static var legacySocketPath: String { "/tmp/panespace-\(getuid()).sock" }
 
     private static func withAddress<T>(_ path: String, _ body: (UnsafePointer<sockaddr>, socklen_t) -> T) -> T {
         var addr = sockaddr_un()
@@ -15,6 +23,16 @@ public enum IPC {
         return withUnsafePointer(to: &addr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { body($0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
         }
+    }
+
+    /// No SIGPIPE when the other side is gone (it would kill the daemon), and no read or write that waits forever
+    /// on a client that never finishes its request.
+    private static func configure(_ fd: Int32, timeout seconds: Int) {
+        var on: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+        var tv = timeval(tv_sec: seconds, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
     }
 
     private static func readAll(_ fd: Int32) -> Data {
@@ -41,10 +59,15 @@ public enum IPC {
 
     /// Returns nil when no daemon is listening.
     public static func send(type: String, payload: String) -> String? {
+        send(type: type, payload: payload, to: socketPath) ?? send(type: type, payload: payload, to: legacySocketPath)
+    }
+
+    private static func send(type: String, payload: String, to path: String) -> String? {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return nil }
         defer { close(fd) }
-        guard withAddress(socketPath, { connect(fd, $0, $1) }) == 0 else { return nil }
+        configure(fd, timeout: 15)  // a busy daemon can take a while; a wedged one mustn't hang the CLI forever
+        guard withAddress(path, { connect(fd, $0, $1) }) == 0 else { return nil }
         writeAll(fd, Data("\(type)\n\(payload)".utf8))
         shutdown(fd, SHUT_WR)
         return String(decoding: readAll(fd), as: UTF8.self)
@@ -63,6 +86,7 @@ public enum IPC {
             while true {
                 let client = accept(fd, nil, nil)
                 if client < 0 { continue }
+                configure(client, timeout: 2)  // one stuck client must not block every later one
                 let req = String(decoding: readAll(client), as: UTF8.self)
                 let (type, payload) = req.firstIndex(of: "\n").map {
                     (String(req[..<$0]), String(req[req.index(after: $0)...]))

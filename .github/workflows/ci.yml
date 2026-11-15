@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+      - name: Build
+        run: swift build -c release
+      - name: Test
+        run: swift test
+      - name: Bundle the apps
+        run: make app SIGN_ID=-
+      - name: Check the bundle
+        run: |
+          test -d Panespace.app/Contents/Frameworks/Sparkle.framework
+          codesign --verify --deep --strict Panespace.app
+          Panespace.app/Contents/MacOS/panespace --version

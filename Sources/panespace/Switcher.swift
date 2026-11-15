@@ -1,12 +1,14 @@
 import AppKit
 import PanespaceCore
 
-/// The window switcher (leader + Space or K): a search box over every window, Spotlight/Raycast style.
+/// The window switcher (leader + Space or K): a search box over every window, command-palette style.
 /// Type to filter (fuzzy, app names count most), ↑/↓ or ⌃N/⌃P to pick, Return to jump there, Esc to leave.
 final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate {
     private var panel: KeyPanel?
+    private var scrim: NSWindow?
     private let field = NSTextField()
     private let table = NSTableView()
+    private let section = NSTextField(labelWithString: "")
     private let empty = NSTextField(labelWithString: "No windows match")
     private let scroll = NSScrollView()
     private var scrollHeight: NSLayoutConstraint?
@@ -18,11 +20,14 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
     private var anchorTop: CGFloat = 0
     var isOpen: Bool { panel?.isVisible ?? false }
 
-    private static let width: CGFloat = 640
-    private static let rowHeight: CGFloat = 46
-    private static let maxRows = 9
-    private static let headerHeight: CGFloat = 54
-    private static let listPadding: CGFloat = 6
+    private static let width: CGFloat = 680
+    private static let rowHeight: CGFloat = 50
+    private static let maxRows = 8
+    private static let headerHeight: CGFloat = 62
+    private static let sectionHeight: CGFloat = 30
+    private static let listBottom: CGFloat = 8
+    private static let footerHeight: CGFloat = 46
+    private static let radius: CGFloat = 18
 
     /// Opens on `screenFrame` (Cocoa coordinates). `pick` gets the chosen window, or nil when dismissed.
     func show(_ entries: [SwitcherEntry], on screenFrame: NSRect, pick: @escaping (WindowID?) -> Void) {
@@ -32,19 +37,43 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
         onPick = pick
         icons = [:]
         self.screenFrame = screenFrame
-        anchorTop = screenFrame.minY + screenFrame.height * 0.68
+        anchorTop = screenFrame.minY + screenFrame.height * 0.72
         let p = panel ?? build()
         panel = p
         field.stringValue = ""
         reload()
+        showScrim(on: screenFrame)
         NSApp.activate(ignoringOtherApps: true)
         p.alphaValue = 0
         p.makeKeyAndOrderFront(nil)
         p.makeFirstResponder(field)
         NSAnimationContext.runAnimationGroup { c in
-            c.duration = 0.12
+            c.duration = 0.14
+            c.timingFunction = CAMediaTimingFunction(name: .easeOut)
             p.animator().alphaValue = 1
+            scrim?.animator().alphaValue = 1
         }
+    }
+
+    /// A soft dim over the whole display behind the panel, so the palette reads as the one thing in front.
+    /// Click-through: a click anywhere still lands in the app under it, which dismisses the switcher.
+    private func showScrim(on visible: NSRect) {
+        let full = NSScreen.screens.first { $0.visibleFrame == visible }?.frame ?? visible
+        let w = scrim ?? {
+            let w = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
+            w.isOpaque = false
+            w.hasShadow = false
+            w.ignoresMouseEvents = true
+            w.isReleasedWhenClosed = false
+            w.backgroundColor = NSColor.black.withAlphaComponent(0.28)
+            w.level = NSWindow.Level(rawValue: NSWindow.Level.modalPanel.rawValue - 1)
+            w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+            scrim = w
+            return w
+        }()
+        w.setFrame(full, display: false)
+        w.alphaValue = 0
+        w.orderFrontRegardless()
     }
 
     private func build() -> KeyPanel {
@@ -60,17 +89,20 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
         p.delegate = self
         p.onKey = { [weak self] e in self?.key(e) ?? false }
 
-        let bg = PanelBackground()
+        let bg = PanelBackground(radius: Self.radius)
         p.contentView = bg
         let tint = Tint()
-        tint.translatesAutoresizingMaskIntoConstraints = false
-        bg.addSubview(tint)
+        let rim = Rim(radius: Self.radius)
 
         let glass = NSImageView(image: NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)!)
-        glass.symbolConfiguration = .init(pointSize: 16, weight: .medium)
+        glass.symbolConfiguration = .init(pointSize: 17, weight: .regular)
         glass.contentTintColor = .secondaryLabelColor
-        field.placeholderString = "Search windows…"
-        field.font = .systemFont(ofSize: 18, weight: .regular)
+        field.placeholderAttributedString = NSAttributedString(string: "Search windows…", attributes: [
+            .font: NSFont.systemFont(ofSize: 17, weight: .regular),
+            .foregroundColor: NSColor.tertiaryLabelColor,
+        ])
+        field.font = .systemFont(ofSize: 17, weight: .regular)
+        field.textColor = .labelColor
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
@@ -78,9 +110,8 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
         field.delegate = self
         field.cell?.isScrollable = true
 
-        let line = NSBox()
-        line.boxType = .separator
-        line.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        section.font = .systemFont(ofSize: 12, weight: .medium)
+        section.textColor = .secondaryLabelColor
 
         let col = NSTableColumn(identifier: .init("w"))
         col.resizingMask = .autoresizingMask
@@ -105,40 +136,75 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
         scroll.scrollerStyle = .overlay
 
         empty.textColor = .tertiaryLabelColor
-        empty.font = .systemFont(ofSize: 13)
+        empty.font = .systemFont(ofSize: 13.5)
         empty.alignment = .center
 
+        let line = Hairline()
+        let footer = Self.footer()
+
+        for v in [tint, glass, field, section, scroll, empty, line, footer, rim] as [NSView] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            bg.addSubview(v)
+        }
+        let h = Self.headerHeight
+        scrollHeight = scroll.heightAnchor.constraint(equalToConstant: Self.rowHeight)
         NSLayoutConstraint.activate([
             tint.topAnchor.constraint(equalTo: bg.topAnchor),
             tint.bottomAnchor.constraint(equalTo: bg.bottomAnchor),
             tint.leadingAnchor.constraint(equalTo: bg.leadingAnchor),
             tint.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
-        ])
-        for v in [glass, field, line, scroll, empty] as [NSView] {
-            v.translatesAutoresizingMaskIntoConstraints = false
-            bg.addSubview(v)
-        }
-        let h = Self.headerHeight
-        let pad = Self.listPadding
-        scrollHeight = scroll.heightAnchor.constraint(equalToConstant: Self.rowHeight)
-        NSLayoutConstraint.activate([
-            glass.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 18),
-            glass.centerYAnchor.constraint(equalTo: bg.topAnchor, constant: h / 2),
-            field.leadingAnchor.constraint(equalTo: glass.trailingAnchor, constant: 10),
-            field.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -18),
+            rim.topAnchor.constraint(equalTo: bg.topAnchor),
+            rim.bottomAnchor.constraint(equalTo: bg.bottomAnchor),
+            rim.leadingAnchor.constraint(equalTo: bg.leadingAnchor),
+            rim.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
+
+            glass.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 22),
+            glass.centerYAnchor.constraint(equalTo: bg.topAnchor, constant: h / 2 + 2),
+            field.leadingAnchor.constraint(equalTo: glass.trailingAnchor, constant: 12),
+            field.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -22),
             field.centerYAnchor.constraint(equalTo: glass.centerYAnchor),
-            line.topAnchor.constraint(equalTo: bg.topAnchor, constant: h),
-            line.leadingAnchor.constraint(equalTo: bg.leadingAnchor),
-            line.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: line.bottomAnchor, constant: pad),
-            scroll.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 6),
-            scroll.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -6),
-            scroll.bottomAnchor.constraint(equalTo: bg.bottomAnchor, constant: -pad),
+
+            section.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 22),
+            section.trailingAnchor.constraint(lessThanOrEqualTo: bg.trailingAnchor, constant: -22),
+            section.bottomAnchor.constraint(equalTo: bg.topAnchor, constant: h + Self.sectionHeight - 8),
+
+            scroll.topAnchor.constraint(equalTo: bg.topAnchor, constant: h + Self.sectionHeight),
+            scroll.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 8),
+            scroll.trailingAnchor.constraint(equalTo: bg.trailingAnchor, constant: -8),
             scrollHeight!,
             empty.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
             empty.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
+
+            line.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: Self.listBottom),
+            line.leadingAnchor.constraint(equalTo: bg.leadingAnchor),
+            line.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
+            line.heightAnchor.constraint(equalToConstant: 1),
+            footer.topAnchor.constraint(equalTo: line.bottomAnchor),
+            footer.leadingAnchor.constraint(equalTo: bg.leadingAnchor, constant: 18),
+            footer.trailingAnchor.constraint(lessThanOrEqualTo: bg.trailingAnchor, constant: -18),
+            footer.heightAnchor.constraint(equalToConstant: Self.footerHeight),
         ])
         return p
+    }
+
+    /// ↑ ↓ Navigate   Enter Select   Esc Close
+    private static func footer() -> NSStackView {
+        func hint(_ keys: [String], _ label: String) -> NSStackView {
+            let caps = keys.map { Keycap($0) as NSView }
+            let text = NSTextField(labelWithString: label)
+            text.font = .systemFont(ofSize: 13, weight: .regular)
+            text.textColor = .secondaryLabelColor
+            let s = NSStackView(views: caps + [text])
+            s.orientation = .horizontal
+            s.spacing = 6
+            s.setCustomSpacing(9, after: caps.last!)
+            return s
+        }
+        let s = NSStackView(views: [hint(["↑", "↓"], "Navigate"), hint(["Enter"], "Select"), hint(["Esc"], "Close")])
+        s.orientation = .horizontal
+        s.alignment = .centerY
+        s.spacing = 22
+        return s
     }
 
     private func reload() {
@@ -146,6 +212,7 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
         let rows = max(1, min(Self.maxRows, shown.count))
         scrollHeight?.constant = CGFloat(rows) * Self.rowHeight
         table.reloadData()
+        section.stringValue = field.stringValue.isEmpty ? "Windows" : "Results"
         empty.stringValue = field.stringValue.isEmpty ? "No windows" : "No windows match"
         empty.isHidden = !shown.isEmpty
         if !shown.isEmpty { select(0) }
@@ -155,7 +222,8 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
     private func layoutPanel() {
         guard let p = panel else { return }
         let rows = max(1, min(Self.maxRows, shown.count))
-        let height = Self.headerHeight + 1 + Self.listPadding * 2 + CGFloat(rows) * Self.rowHeight
+        let height = Self.headerHeight + Self.sectionHeight + CGFloat(rows) * Self.rowHeight + Self.listBottom
+            + 1 + Self.footerHeight
         p.setFrame(NSRect(x: screenFrame.midX - Self.width / 2, y: anchorTop - height,
                           width: Self.width, height: height), display: true)
     }
@@ -189,8 +257,10 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
         let pick = onPick
         onPick = nil
         p.orderOut(nil)
+        scrim?.orderOut(nil)
         all = []
         shown = []
+        table.reloadData()
         icons = [:]
         pick?(id)
     }
@@ -205,43 +275,142 @@ final class SwitcherPanel: NSObject, NSTextFieldDelegate, NSTableViewDataSource,
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { SwitcherRowView() }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard shown.indices.contains(row) else { return nil }  // asked after close() emptied the list
         let e = shown[row]
         let cell = (tableView.makeView(withIdentifier: .init("row"), owner: nil) as? SwitcherRow) ?? SwitcherRow()
         cell.identifier = .init("row")
         let icon = icons[e.pid] ?? NSRunningApplication(processIdentifier: e.pid)?.icon
         icons[e.pid] = icon
         let redundantApp = e.title.compare(e.app, options: .caseInsensitive) == .orderedSame
+        let badge = e.isFullScreen ? "Full Screen" : e.isAway ? "Minimized" : e.workspace ?? "Scratchpad"
         cell.set(icon: icon, title: e.title.isEmpty ? e.app : e.title,
                  detail: e.title.isEmpty || redundantApp ? "" : e.app,
-                 badge: e.isAway ? "min" : e.workspace ?? "scratch", floating: e.isFloating, query: field.stringValue)
+                 badge: badge, floating: e.isFloating, query: field.stringValue)
         return cell
     }
 }
 
-/// The rounded, translucent sheet behind the switcher, with a hairline that follows the system appearance.
+private extension NSColor {
+    /// One color per appearance, resolved whenever it's drawn.
+    static func adaptive(dark: NSColor, light: NSColor) -> NSColor {
+        NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light }
+    }
+
+    static let paletteBackground = adaptive(dark: NSColor(srgbRed: 0.055, green: 0.055, blue: 0.06, alpha: 0.86),
+                                            light: NSColor(srgbRed: 0.985, green: 0.985, blue: 0.99, alpha: 0.86))
+    static let paletteRim = adaptive(dark: NSColor.white.withAlphaComponent(0.10), light: NSColor.black.withAlphaComponent(0.10))
+    static let paletteLine = adaptive(dark: NSColor.white.withAlphaComponent(0.07), light: NSColor.black.withAlphaComponent(0.07))
+    static let paletteSelection = adaptive(dark: NSColor.white.withAlphaComponent(0.075), light: NSColor.black.withAlphaComponent(0.055))
+    static let paletteChip = adaptive(dark: NSColor.white.withAlphaComponent(0.08), light: NSColor.black.withAlphaComponent(0.06))
+}
+
+/// The rounded blur behind the switcher.
 private final class PanelBackground: NSVisualEffectView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        material = .popover
+    init(radius: CGFloat) {
+        super.init(frame: .zero)
+        material = .hudWindow
         blendingMode = .behindWindow
         state = .active
         wantsLayer = true
-        layer?.cornerRadius = 14
+        layer?.cornerRadius = radius
         layer?.cornerCurve = .continuous
         layer?.masksToBounds = true
-        updateBorder()
     }
 
     required init?(coder: NSCoder) { fatalError() }
+}
+
+/// A near-opaque neutral tint over the blur: the wallpaper's color no longer decides whether text is readable.
+private final class Tint: NSView {
+    override var isOpaque: Bool { false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.paletteBackground.setFill()
+        dirtyRect.fill()
+    }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        updateBorder()
+        needsDisplay = true
+    }
+}
+
+/// The hairline around the panel's edge, drawn inside its rounded corners.
+private final class Rim: NSView {
+    private let radius: CGFloat
+    init(radius: CGFloat) {
+        self.radius = radius
+        super.init(frame: .zero)
     }
 
-    private func updateBorder() {
-        layer?.borderWidth = 0.5
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.7).cgColor
+    required init?(coder: NSCoder) { fatalError() }
+    override var isOpaque: Bool { false }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: radius - 0.5, yRadius: radius - 0.5)
+        path.lineWidth = 1
+        NSColor.paletteRim.setStroke()
+        path.stroke()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+}
+
+private final class Hairline: NSView {
+    override var isOpaque: Bool { false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.paletteLine.setFill()
+        bounds.fill()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+}
+
+/// A rounded key: footer hints (↑, Enter, Esc) and the workspace a window lives on.
+private final class Keycap: NSView {
+    private let label: NSTextField
+
+    init(_ text: String, size: CGFloat = 12, minWidth: CGFloat = 24, height: CGFloat = 24) {
+        label = NSTextField(labelWithString: text)
+        super.init(frame: .zero)
+        label.font = .systemFont(ofSize: size, weight: .medium)
+        label.textColor = .secondaryLabelColor
+        label.alignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 7),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -7),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            heightAnchor.constraint(equalToConstant: height),
+            widthAnchor.constraint(greaterThanOrEqualToConstant: minWidth),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isOpaque: Bool { false }
+
+    var text: String {
+        get { label.stringValue }
+        set { label.stringValue = newValue }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.paletteChip.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
     }
 }
 
@@ -255,36 +424,17 @@ final class KeyPanel: NSPanel {
     }
 }
 
-/// Inset, rounded highlight instead of the raw full-width table selection.
+/// Inset, rounded, neutral highlight instead of the raw full-width (accent-blue) table selection.
 private final class SwitcherRowView: NSTableRowView {
+    // Never the emphasized (white-text) style: the highlight is light, so text keeps its own colors.
+    override var isEmphasized: Bool {
+        get { false }
+        set {}
+    }
+
     override func drawSelection(in dirtyRect: NSRect) {
-        let r = bounds.insetBy(dx: 6, dy: 2)
-        NSColor.controlAccentColor.withAlphaComponent(0.24).setFill()
-        NSBezierPath(roundedRect: r, xRadius: 8, yRadius: 8).fill()
-    }
-}
-
-/// A neutral tint over the blur: the wallpaper's color no longer decides whether text is readable.
-private final class Tint: NSView {
-    override var isOpaque: Bool { false }
-
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.windowBackgroundColor.withAlphaComponent(0.6).setFill()
-        dirtyRect.fill()
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        needsDisplay = true
-    }
-}
-
-private final class BadgeBackground: NSView {
-    override var isOpaque: Bool { false }
-
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.controlAccentColor.withAlphaComponent(0.14).setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: 5.5, yRadius: 5.5).fill()
+        NSColor.paletteSelection.setFill()
+        NSBezierPath(roundedRect: bounds.insetBy(dx: 0, dy: 1), xRadius: 10, yRadius: 10).fill()
     }
 }
 
@@ -293,53 +443,41 @@ private final class SwitcherRow: NSTableCellView {
     private let text = NSStackView()
     private let title = NSTextField(labelWithString: "")
     private let detail = NSTextField(labelWithString: "")
-    private let badge = NSTextField(labelWithString: "")
-    private let badgeBack = BadgeBackground()
+    private let badge = Keycap("", size: 11.5, minWidth: 26, height: 24)
 
     init() {
         super.init(frame: .zero)
-        title.font = .systemFont(ofSize: 13.5, weight: .medium)
-        title.lineBreakMode = .byTruncatingTail
-        detail.font = .systemFont(ofSize: 11.5)
+        detail.font = .systemFont(ofSize: 12.5)
         detail.textColor = .secondaryLabelColor
-        detail.lineBreakMode = .byTruncatingTail
-        badge.font = .monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold)
-        badge.textColor = .controlAccentColor
-        badge.alignment = .center
 
         text.orientation = .vertical
         text.alignment = .leading
-        text.spacing = 1
+        text.spacing = 2
         text.addArrangedSubview(title)
         text.addArrangedSubview(detail)
         text.distribution = .fill
 
-        for v in [icon, text, badgeBack, badge] as [NSView] {
+        for v in [icon, text, badge] as [NSView] {
             v.translatesAutoresizingMaskIntoConstraints = false
             addSubview(v)
         }
-        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        detail.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         for label in [title, detail] {
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             label.usesSingleLineMode = true
             label.maximumNumberOfLines = 1
             label.lineBreakMode = .byTruncatingTail
         }
+        badge.setContentCompressionResistancePriority(.required, for: .horizontal)
         NSLayoutConstraint.activate([
-            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
             icon.widthAnchor.constraint(equalToConstant: 26),
             icon.heightAnchor.constraint(equalToConstant: 26),
-            text.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 12),
-            text.trailingAnchor.constraint(equalTo: badgeBack.leadingAnchor, constant: -12),
+            text.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 14),
+            text.trailingAnchor.constraint(lessThanOrEqualTo: badge.leadingAnchor, constant: -14),
             text.centerYAnchor.constraint(equalTo: centerYAnchor),
-            badgeBack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
-            badgeBack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            badgeBack.heightAnchor.constraint(equalToConstant: 19),
-            badgeBack.widthAnchor.constraint(greaterThanOrEqualToConstant: 26),
-            badge.leadingAnchor.constraint(equalTo: badgeBack.leadingAnchor, constant: 6),
-            badge.trailingAnchor.constraint(equalTo: badgeBack.trailingAnchor, constant: -6),
-            badge.centerYAnchor.constraint(equalTo: badgeBack.centerYAnchor),
+            badge.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            badge.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
 
@@ -348,20 +486,25 @@ private final class SwitcherRow: NSTableCellView {
     func set(icon img: NSImage?, title t: String, detail d: String, badge b: String, floating: Bool, query: String) {
         icon.image = img
         title.attributedStringValue = Self.highlighted(t, query: query)
-        let subtitle = d.isEmpty ? (floating ? "floating" : "") : (floating ? d + " · floating" : d)
+        let subtitle = d.isEmpty ? (floating ? "Floating" : "") : (floating ? d + " · Floating" : d)
         detail.stringValue = subtitle
         detail.isHidden = subtitle.isEmpty
-        badge.stringValue = b
+        badge.text = b
     }
 
-    /// The query's characters in order, the ones that matched tinted with the accent color.
+    /// The query's characters in order: the ones that matched in full white (or black), the rest a step dimmer.
     private static func highlighted(_ text: String, query: String) -> NSAttributedString {
-        let font = NSFont.systemFont(ofSize: 13.5, weight: .regular)
-        let s = NSMutableAttributedString(string: text, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+        let size: CGFloat = 14.5
+        let base: NSColor = query.isEmpty ? .labelColor : .secondaryLabelColor
+        let s = NSMutableAttributedString(string: text, attributes: [
+            .font: NSFont.systemFont(ofSize: size, weight: .regular), .foregroundColor: base,
+        ])
         var from = text.startIndex
         for ch in query where !ch.isWhitespace {
             guard let r = text.range(of: String(ch), options: .caseInsensitive, range: from..<text.endIndex) else { break }
-            s.addAttribute(.font, value: NSFont.systemFont(ofSize: 13.5, weight: .semibold), range: NSRange(r, in: text))
+            let range = NSRange(r, in: text)
+            s.addAttributes([.font: NSFont.systemFont(ofSize: size, weight: .semibold), .foregroundColor: NSColor.labelColor],
+                            range: range)
             from = r.upperBound
         }
         return s

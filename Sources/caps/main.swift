@@ -41,8 +41,9 @@ case nil:
         .filter { $0.processIdentifier != getpid() }
     if !others.isEmpty {
         fputs("caps: already running\n", stderr)
-        exit(1)
+        exit(0)  // not a failure: launchd's KeepAlive must not keep relaunching a duplicate
     }
+    signal(SIGPIPE, SIG_IGN)  // panespace closing the IPC socket early must not kill Caps
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
     let delegate = AppDelegate()
