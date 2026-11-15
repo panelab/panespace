@@ -58,17 +58,17 @@
     },
     docs: {
       app: "Browser", title: "Configuration: Panespace",
-      body: `<div class="win-body doc"><h4>Configuration</h4><div class="line"></div><div class="line mid"></div><div class="line short"></div><div class="card"><div class="line mid"></div><div class="line short"></div></div><div class="line"></div><div class="line mid"></div></div>`,
+      body: `<div class="win-body doc"><h4>Configuration</h4><p>Panespace writes a commented default config to <code>~/.config/panespace/config</code> on first run.</p><p>Edit it from the menu bar, then reload with <b>$mod+Shift+C</b>.</p><h5>Gaps</h5><p><code>gaps inner 8</code> puts 8 points between windows. <code>smart_gaps on</code> drops them when a workspace has one window.</p></div>`,
       raw: true,
     },
-    music: {
-      app: "Music", title: "Now playing",
-      body: `<div class="win-body music"><div class="art"></div><div class="track">Night Drive</div><div class="artist">Seaside Static</div><div class="bar"><i></i></div></div>`,
+    files: {
+      app: "Finder", title: "panespace",
+      body: `<div class="win-body files"><p><span>Sources</span><span>Folder</span></p><p><span>Tests</span><span>Folder</span></p><p><span>site</span><span>Folder</span></p><p><span>Makefile</span><span>Document</span></p><p><span>Package.swift</span><span>Swift file</span></p><p><span>README.md</span><span>Markdown</span></p></div>`,
       raw: true,
     },
     notes: {
       app: "Notes", title: "Release checklist",
-      body: `<div class="win-body doc"><h4>Release checklist</h4><p>Bump the build number</p><p>Tag and push v0.3.0</p><p class="t-dim">Check the appcast</p><div class="line short"></div></div>`,
+      body: `<div class="win-body doc"><h4>Release checklist</h4><p>Bump CFBundleVersion in both plists</p><p>Merge to main, wait for CI</p><p>Tag v0.3.0 and push the tag</p><p class="t-dim">Check the appcast after the release job</p></div>`,
       raw: true,
     },
     tests: {
@@ -76,7 +76,7 @@
       body: `<p>$ make test</p><p class="t-dim">Building for debugging...</p><p class="t-dim">Test Suite 'All tests' started</p><p>Executed <span class="t-yel">104</span> tests, with</p><p><span class="t-grn">0 failures</span> in 15.2 seconds</p><p>$ <span class="t-dim">▍</span></p>`,
     },
   };
-  const ORDER = ["term", "editor", "docs", "music", "notes", "tests"];
+  const ORDER = ["term", "editor", "docs", "files", "notes", "tests"];
   const MAX = 6;
 
   let nextId = 1;
@@ -84,7 +84,7 @@
   const state = {
     ws: [
       { wins: [mk("term"), mk("editor"), mk("docs")], focus: 0, zoom: false },
-      { wins: [mk("music"), mk("notes")], focus: 0, zoom: false },
+      { wins: [mk("notes"), mk("files")], focus: 0, zoom: false },
       { wins: [], focus: 0, zoom: false },
     ],
     current: 0,
