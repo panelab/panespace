@@ -69,7 +69,7 @@ jobs:
           set -e
           codesign --verify --deep --strict --verbose=2 Panespace.app
           codesign --verify --deep --strict --verbose=2 Caps.app
-          codesign -dv Panespace.app 2>&1 | grep -q "Authority=Panespace Release Signing"
+          codesign -dvv Panespace.app 2>&1 | grep "Authority=Panespace Release Signing"
           test -d Panespace.app/Contents/Frameworks/Sparkle.framework
           lipo -archs Panespace.app/Contents/MacOS/panespace | grep -q x86_64
           lipo -archs Panespace.app/Contents/MacOS/panespace | grep -q arm64
