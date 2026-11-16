@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Panespace | The keyboard-first tiling window manager for macOS</title>
+<title>Panespace: the keyboard-first tiling window manager for macOS</title>
 <meta name="description" content="Windows tile the moment they open, workspaces switch without the Spaces animation, and your i3 config mostly just works. Free public beta for macOS 13 and later.">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0b0b0b">
 <link rel="canonical" href="https://panespace.pages.dev/">
 <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
 <link rel="apple-touch-icon" href="/icon-256.png">
@@ -16,9 +16,8 @@
 <meta property="og:description" content="Windows tile the moment they open, workspaces switch instantly, and your i3 config mostly just works.">
 <meta property="og:image" content="https://panespace.pages.dev/og.png">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..600&display=swap">
+<link rel="preload" href="/fonts/Geist-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/Geist-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/styles.css">
 <script src="/site.js" defer></script>
 </head>
@@ -27,170 +26,167 @@
 
 <header class="nav" data-nav>
   <div class="container nav-inner">
-    <a class="brand" href="/" aria-label="Panespace home">
-      <img src="/icon-64.png" width="22" height="22" alt="">
+    <a class="brand" href="/">
+      <img src="/icon-64.png" width="24" height="24" alt="">
       <span>Panespace</span>
-      <span class="tag">Beta</span>
+      <span class="beta">Beta</span>
     </a>
     <nav class="nav-links" aria-label="Site">
+      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#shortcuts">Shortcuts</a>
       <a class="hide-sm" href="https://github.com/panelab/panespace#readme">Docs</a>
-      <a class="hide-sm" href="https://github.com/panelab/panespace/releases">Releases</a>
-      <a href="https://github.com/panelab/panespace" class="stars">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.61a.75.75 0 0 1 .41 1.28l-3.03 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.33l-3.76 1.98a.75.75 0 0 1-1.09-.79l.72-4.18L.84 6.36a.75.75 0 0 1 .41-1.28l4.2-.61L7.33.67A.75.75 0 0 1 8 .25Z"/></svg>
-        <span data-stars>Star</span><span class="hide-sm"> on GitHub</span>
-      </a>
+      <a class="stars" href="https://github.com/panelab/panespace" aria-label="Panespace on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.35c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.19c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg><span data-stars class="hide-sm">GitHub</span></a>
+      <a class="btn btn-secondary" href="https://github.com/panelab/panespace/releases/latest" data-download>Download</a>
     </nav>
   </div>
 </header>
 
 <main id="main">
-
   <section class="hero" aria-labelledby="hero-title">
-
-
     <div class="container hero-copy">
+      <div>
       <h1 id="hero-title">The keyboard&#8209;first tiling window manager for&nbsp;macOS</h1>
-      <p class="lede">Windows tile the moment they open, workspaces switch without the Spaces animation, and the i3 config you already have mostly just works. No SIP changes, nothing injected into the Dock.</p>
-      <a class="btn btn-primary btn-lg" href="https://github.com/panelab/panespace/releases/latest" data-download>
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8m0 0L4.75 7.25M8 10.5l3.25-3.25M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Download the beta
-      </a>
-      <a class="text-link" href="https://github.com/panelab/panespace">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.35c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.19c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>
-        Read the source
-        <svg class="arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 10.5 10.5 5.5M6 5.5h4.5V10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-      <p class="meta"><span data-version>Public beta, version 0.2.0</span> · macOS 13 or later · Apple silicon and Intel</p>
+      <p class="lede">Windows tile as they open, workspaces switch instantly, and your i3 config mostly just works.</p>
+      </div>
+      <div>
+      <div class="cta-row">
+        <a class="btn btn-primary btn-lg" href="https://github.com/panelab/panespace/releases/latest" data-download><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8m0 0L4.75 7.25M8 10.5l3.25-3.25M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Download the beta</a>
+        <a class="btn btn-secondary btn-lg" href="https://github.com/panelab/panespace"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.35c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.19c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>View on GitHub</a>
+      </div>
+      <p class="meta"><span data-version>Public beta 0.2.0</span><span>macOS 13 or later</span></p>
+      </div>
     </div>
 
     <div class="container demo-wrap">
       <div class="demo" data-demo tabindex="0" role="application" aria-roledescription="interactive demo"
-           aria-label="Panespace demo. Press Return for a new window, H J K L or the arrow keys to move focus, 1 2 3 to switch workspace, F to zoom, Q to close.">
-        <div class="mac-bar" aria-hidden="true">
-          <span class="mac-app" data-front-app>Terminal</span>
-          <span class="mac-menu">File</span><span class="mac-menu">Edit</span><span class="mac-menu">View</span><span class="mac-menu">Window</span>
+           aria-label="Panespace demo. Return opens a window. H, J, K and L or the arrow keys move focus. Shift with them moves the window. 1, 2 and 3 switch workspace. F toggles full screen. Q closes the window.">
+        <div class="menubar" aria-hidden="true">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.2 8.5c0-1.5 1.2-2.2 1.3-2.3-.7-1-1.8-1.2-2.2-1.2-.9-.1-1.8.6-2.3.6s-1.2-.5-2-.5C5 5.1 4 5.7 3.4 6.6c-1.2 2-.3 5 .8 6.7.6.8 1.2 1.7 2 1.7s1.1-.5 2-.5 1.2.5 2 .5 1.4-.8 1.9-1.6c.6-.9.9-1.8.9-1.9 0 0-1.8-.7-1.8-2.5ZM9.7 4c.4-.5.7-1.2.6-1.9-.6 0-1.3.4-1.8.9-.4.4-.7 1.1-.6 1.8.7.1 1.3-.3 1.8-.8Z"/></svg><span class="app" data-front-app>Terminal</span>
+          <span class="m">File</span><span class="m">Edit</span><span class="m">View</span><span class="m">Window</span><span class="m">Help</span>
           <span class="spacer"></span>
-          <span class="ws-indicator" data-ws-indicator><span data-ws="0" class="on">1</span><span data-ws="1">2</span><span data-ws="2">3</span></span>
-          <span class="mac-clock">Sun 9:41</span>
+          <span class="ws-ind" data-ws-indicator><span class="on">1</span><span>2</span><span>3</span></span>
+          <svg class="batt" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6.2a8.5 8.5 0 0 1 12 0M4.2 8.6a5.3 5.3 0 0 1 7.6 0M6.4 11a2.2 2.2 0 0 1 3.2 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><svg class="batt" viewBox="0 0 20 12" aria-hidden="true" style="width:20px"><rect x="0.75" y="1.25" width="16" height="9.5" rx="2.5" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-width="1"/><rect x="2.25" y="2.75" width="11" height="6.5" rx="1.25" fill="currentColor"/><path d="M18.25 4.5v3" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.25" stroke-linecap="round"/></svg>
+          <span class="clock">Mon 9:41</span>
         </div>
-        <div class="screen" aria-hidden="true"><div class="ws-strip" data-strip></div></div>
+        <div class="screen" aria-hidden="true" data-screen></div>
+        <div class="keycast" aria-hidden="true" data-keycast><span class="keys-row" data-keycast-keys></span><span data-keycast-label></span></div>
         <p class="sr-only" aria-live="polite" data-announce></p>
       </div>
-      <div class="demo-keys" role="group" aria-label="Demo controls">
-        <span class="demo-hint">Click the desktop and drive it</span>
-        <button type="button" data-cmd="new"><kbd>⏎</kbd>new window</button>
-        <button type="button" data-cmd="focus-next"><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd>focus</button>
-        <button type="button" data-cmd="ws-next"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>workspace</button>
-        <button type="button" data-cmd="zoom"><kbd>F</kbd>zoom</button>
-        <button type="button" data-cmd="close"><kbd>Q</kbd>close</button>
+      <div class="demo-controls" role="group" aria-label="Demo controls">
+        <p class="demo-hint"><strong>Live demo.</strong> <span data-hint>Playing a short tour. Click the desktop to drive it.</span></p>
+        <div class="demo-buttons">
+        <button type="button" class="chip-btn play" data-play aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true" data-icon-pause><path d="M5.5 3.5v9M10.5 3.5v9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><svg viewBox="0 0 16 16" aria-hidden="true" data-icon-play hidden><path d="M5 3.4v9.2a.6.6 0 0 0 .9.5l7.4-4.6a.6.6 0 0 0 0-1L5.9 2.9a.6.6 0 0 0-.9.5Z" fill="currentColor"/></svg><span class="label" data-play-label>Pause tour</span></button>
+        <button type="button" class="chip-btn" data-cmd="new" aria-label="New window"><kbd><span class="g g-ret" aria-hidden="true"></span><span class="sr-only">Return</span></kbd><span class="label">New window</span></button>
+        <button type="button" class="chip-btn" data-cmd="focus-next" aria-label="Focus the next window"><kbd>L</kbd><span class="label">Focus</span></button>
+        <button type="button" class="chip-btn" data-cmd="ws-next" aria-label="Next workspace"><kbd>2</kbd><span class="label">Workspace</span></button>
+        <button type="button" class="chip-btn" data-cmd="zoom" aria-label="Toggle full screen"><kbd>F</kbd><span class="label">Full screen</span></button>
+        <button type="button" class="chip-btn" data-cmd="close" aria-label="Close window"><kbd>Q</kbd><span class="label">Close</span></button>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="section" id="config" aria-labelledby="config-title">
-    <div class="container">
-      <h2 id="config-title">Bring your i3 config</h2>
-      <p class="section-lede">Panespace reads i3's syntax, so your bindings, modes and rules come along. It writes a commented default on first run if you're starting fresh.</p>
-      <ul class="strip">
-        <li><b>bindsym</b><code>keys and modes</code></li>
-        <li><b>for_window</b><code>rules by app</code></li>
-        <li><b>assign</b><code>apps to workspaces</code></li>
-        <li><b>gaps</b><code>inner, outer, smart</code></li>
-        <li><b>scratchpad</b><code>hide and summon</code></li>
-        <li><b>back_and_forth</b><code>last workspace</code></li>
-      </ul>
-      <ul class="checks inline">
-        <li><code>check-config</code> flags any line it can't use</li>
-        <li>Bindings follow your keyboard layout</li>
-        <li>Reload with <kbd>$mod</kbd><kbd>⇧</kbd><kbd>C</kbd></li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="section" id="features" aria-labelledby="find-title">
+  <section class="section" id="features" aria-labelledby="config-title">
     <div class="container split">
-      <figure class="panel" aria-hidden="true">
-        <div class="palette">
-          <div class="palette-search">
-            <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.25 10.25 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <span>ter</span><span class="caret"></span>
-          </div>
-          <div class="palette-label">Results</div>
-          <ul class="palette-list">
-            <li class="sel"><span class="app-ico"><svg viewBox="0 0 16 16"><path d="m4 5.5 2.5 2.5L4 10.5M8.5 10.5H12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="row-text"><span class="row-title"><b>Ter</b>minal</span><small>zsh: ~/panespace</small></span><kbd>1</kbd></li>
-            <li><span class="app-ico"><svg viewBox="0 0 16 16"><path d="M4.5 2.75h7a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-8.5a1 1 0 0 1 1-1ZM6 6h4M6 8.5h4M6 11h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="row-text"><span class="row-title">In<b>ter</b>view notes</span><small>Notes</small></span><kbd>2</kbd></li>
-            <li><span class="app-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.75 8h10.5M8 2.75c1.5 1.4 2.25 3.15 2.25 5.25S9.5 11.85 8 13.25C6.5 11.85 5.75 10.1 5.75 8S6.5 4.15 8 2.75Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="row-text"><span class="row-title">Mas<b>ter</b>class: Swift concurrency</span><small>Browser</small></span><span class="chip">Full Screen</span></li>
-          </ul>
-          <div class="palette-foot"><kbd>↑</kbd><kbd>↓</kbd><span>Navigate</span><kbd>Enter</kbd><span>Select</span><kbd>Esc</kbd><span>Close</span></div>
-        </div>
-      </figure>
       <div class="split-copy">
-        <h2 id="find-title">Any window, two keystrokes away</h2>
-        <p>The switcher searches every window by app, title or workspace. Window hints put a letter on everything you can see; type it and you're there.</p>
-        <ul class="checks">
-          <li>Fuzzy search, so <code>ter</code> finds Terminal</li>
-          <li>Minimized and full-screen windows show up too</li>
-          <li><code>hints swap</code> trades places with the window you pick</li>
-          <li>Works across every display</li>
+        <h2 id="config-title">Bring your i3 config</h2>
+        <p>Panespace reads i3's syntax, so your bindings, modes and window rules come along. Starting fresh? It writes a commented default on first run.</p>
+        <ul class="points">
+          <li><span><code>check-config</code> flags any line it can't use</span></li>
+          <li><span>Bindings follow your keyboard layout</span></li>
+          <li><span>Reload after an edit with <kbd>$mod</kbd><kbd><span class="g g-shift" aria-hidden="true"></span><span class="sr-only">Shift</span></kbd><kbd>C</kbd></span></li>
         </ul>
       </div>
+      <figure class="stage">
+        <div class="file-win">
+          <div class="file-bar"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>~/.config/panespace/config</span></div>
+          <pre aria-label="Example config file"><code><span class="ln">1</span><span class="tx"><span class="s-com"># Your i3 config, nearly as is</span></span><span class="ln">2</span><span class="tx"><span class="s-kw">set</span> <span class="s-fn">$mod</span> ctrl+alt</span><span class="ln">3</span><span class="tx"> </span><span class="ln">4</span><span class="tx"><span class="s-kw">gaps</span> inner <span class="s-num">8</span></span><span class="ln">5</span><span class="tx"><span class="s-kw">smart_gaps</span> on</span><span class="ln">6</span><span class="tx"><span class="s-kw">default_border</span> pixel <span class="s-num">2</span></span><span class="ln">7</span><span class="tx"><span class="s-kw">client.focused</span> <span class="s-num">#4d9cf8</span> <span class="s-num">#4d9cf8</span> <span class="s-num">#ffffff</span> <span class="s-num">#4d9cf8</span> <span class="s-num">#4d9cf8</span></span><span class="ln">8</span><span class="tx"> </span><span class="ln">9</span><span class="tx"><span class="s-kw">bindsym</span> <span class="s-fn">$mod</span>+Return exec open -na Terminal</span><span class="ln">10</span><span class="tx"><span class="s-kw">bindsym</span> <span class="s-fn">$mod</span>+h focus left</span><span class="ln">11</span><span class="tx"><span class="s-kw">bindsym</span> <span class="s-fn">$mod</span>+Shift+h move left</span><span class="ln">12</span><span class="tx"><span class="s-kw">bindsym</span> <span class="s-fn">$mod</span>+2 workspace number <span class="s-num">2</span></span><span class="ln">13</span><span class="tx"><span class="s-kw">bindsym</span> <span class="s-fn">$mod</span>+slash switcher</span><span class="ln">14</span><span class="tx"> </span><span class="ln">15</span><span class="tx"><span class="s-kw">for_window</span> [app=<span class="s-str">&quot;^Calculator$&quot;</span>] floating enable</span><span class="ln">16</span><span class="tx"><span class="s-kw">assign</span> [app=<span class="s-str">&quot;^Slack$&quot;</span>] <span class="s-num">9</span></span></code></pre>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="find-title">
+    <div class="container split flip">
+      <div class="split-copy">
+        <h2 id="find-title">Any window, two keystrokes away</h2>
+        <p>The switcher searches every window by app, title or workspace. Window hints put a letter on everything you can see. Type it and you're there.</p>
+        <ul class="points">
+          <li><span>Fuzzy search, so <code>ter</code> finds Terminal</span></li>
+          <li><span>Minimized and full-screen windows show up too</span></li>
+          <li><span><code>hints swap</code> trades places with the window you pick</span></li>
+        </ul>
+      </div>
+      <figure class="stage" aria-hidden="true">
+        <div class="palette">
+          <div class="palette-search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.25 10.25 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>ter</span><span class="caret"></span></div>
+          <ul class="palette-list">
+            <li class="sel"><span class="app-ico"><svg viewBox="0 0 16 16"><path d="m4 5.5 2.5 2.5L4 10.5M8.5 10.5H12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="row-text"><span class="row-title"><mark>Ter</mark>minal</span><small>zsh · ~/panespace</small></span><span class="tag">Workspace 1</span></li>
+            <li><span class="app-ico"><svg viewBox="0 0 16 16"><path d="M4.5 2.75h7a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-8.5a1 1 0 0 1 1-1ZM6 6h4M6 8.5h4M6 11h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><span class="row-text"><span class="row-title">In<mark>ter</mark>view notes</span><small>Notes</small></span><span class="tag">Workspace 2</span></li>
+            <li><span class="app-ico"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.75 8h10.5M8 2.75c1.5 1.4 2.25 3.15 2.25 5.25S9.5 11.85 8 13.25C6.5 11.85 5.75 10.1 5.75 8S6.5 4.15 8 2.75Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="row-text"><span class="row-title">Mas<mark>ter</mark>class: Swift concurrency</span><small>Safari</small></span><span class="tag">Full screen</span></li>
+          </ul>
+          <div class="palette-foot"><kbd>↑</kbd><kbd>↓</kbd><span>Move</span><kbd><span class="g g-ret" aria-hidden="true"></span><span class="sr-only">Return</span></kbd><span>Open</span><kbd>esc</kbd><span>Close</span></div>
+        </div>
+      </figure>
     </div>
   </section>
 
   <section class="section" aria-labelledby="ws-title">
-    <div class="container split reverse">
-      <figure class="panel" aria-hidden="true">
+    <div class="container split">
+      <div class="split-copy">
+        <h2 id="ws-title">Workspaces without the wait</h2>
+        <p>Panespace keeps its own workspaces instead of macOS Spaces. Switching moves each window once, with no animation to sit through. Swipe with four fingers and they follow, then snap.</p>
+        <ul class="points">
+          <li><span>Move windows and whole workspaces between displays</span></li>
+          <li><span>Workspaces return to their display when you plug it back in</span></li>
+          <li><span>Immersive mode hides the menu bar with one key</span></li>
+        </ul>
+      </div>
+      <figure class="stage" aria-hidden="true">
         <div class="displays">
           <div class="display laptop">
-            <div class="d-bar"><span class="d-ws"><i>1</i><i class="on">2</i><i>3</i></span></div>
-            <div class="d-tiles t2"><i class="focus"></i><i></i></div>
+            <div class="panel"><div class="mini-bar"><i></i><i class="on"></i><i></i></div><div class="tiles t2"><i class="focus"></i><i></i></div></div>
+            <div class="base"></div>
+            <figcaption>Laptop, workspace 2</figcaption>
           </div>
           <div class="display monitor">
-            <div class="d-bar"><span class="d-ws"><i>4</i><i>5</i><i class="on">9</i></span></div>
-            <div class="d-tiles t3"><i></i><i></i><i></i></div>
+            <div class="panel"><div class="mini-bar"><i></i><i></i><i class="on"></i></div><div class="tiles t3"><i></i><i></i><i></i></div></div>
+            <div class="neck"></div><div class="foot"></div>
+            <figcaption>Monitor, workspace 9</figcaption>
           </div>
         </div>
       </figure>
-      <div class="split-copy">
-        <h2 id="ws-title">Workspaces without the wait</h2>
-        <p>Panespace keeps its own workspaces instead of macOS Spaces, so switching moves each window once and there's no animation to sit through. Swipe with four fingers and they follow your fingers, then snap.</p>
-        <ul class="checks">
-          <li>Move windows and whole workspaces between displays</li>
-          <li>Workspaces go back to their display when it's plugged in</li>
-          <li>Eight menu bar indicator styles</li>
-          <li>Immersive mode hides the menu bar with one key</li>
-        </ul>
-      </div>
     </div>
   </section>
 
   <section class="section" aria-labelledby="cli-title">
     <div class="container">
-      <h2 id="cli-title">Script it like i3</h2>
-      <p class="section-lede"><code>panespace msg</code> works like <code>i3-msg</code>, so your scripts, status bars and launchers can drive it.</p>
+      <div class="section-head">
+        <h2 id="cli-title">Script it like i3</h2>
+        <p><code>panespace msg</code> speaks the same commands as <code>i3-msg</code>, so your scripts, status bars and launchers can drive it.</p>
+      </div>
       <div class="cli">
-        <figure class="term" aria-label="Terminal session using the panespace command">
-          <div class="term-bar"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>~/panespace</span></div>
-<pre><code><span class="p">$</span> panespace msg workspace 3
+        <figure class="term">
+          <div class="file-bar"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>zsh</span></div>
+<pre aria-label="Terminal session using the panespace command"><code><span class="p">$ </span>panespace msg workspace 3
 <span class="o">[{"success": true}]</span>
-<span class="p">$</span> panespace msg '[app="Safari"] focus'
+<span class="p">$ </span>panespace msg '[app="Safari"] focus'
 <span class="o">[{"success": true}]</span>
-<span class="p">$</span> panespace msg -t get_workspaces | jq -r '.[].name'
+<span class="p">$ </span>panespace msg -t get_workspaces | jq -r '.[].name'
 <span class="o">1
 2
 3</span>
-<span class="p">$</span> panespace check-config
-<span class="o">~/.config/panespace/config: 68 bindings in 2 mode(s), 3 rules</span>
-<span class="p">$</span> <span class="cursor"></span></code></pre>
+<span class="p">$ </span>panespace check-config
+<span class="o">~/.config/panespace/config: 68 bindings in 2 mode(s), 3 rules</span></code></pre>
         </figure>
-        <div class="under">
-          <h3>Under the hood</h3>
-          <ul class="checks">
-            <li><b>Accessibility API only.</b> No SIP changes, no scripting additions.</li>
-            <li><b>One background queue per app.</b> A frozen app can't hold up your keys.</li>
-            <li><b>Damped-spring animation,</b> in step with the display, with no overshoot.</li>
-            <li><b>Tested core.</b> The layout tree and config parser are a plain Swift module with unit tests.</li>
-          </ul>
+        <div class="facts">
+          <h3>How it works</h3>
+          <dl>
+            <div><dt>Accessibility API only</dt><dd>No SIP changes and no scripting additions.</dd></div>
+            <div><dt>One background queue per app</dt><dd>A frozen app can't hold up your keys.</dd></div>
+            <div><dt>Spring animation in step with the display</dt><dd>Windows settle without overshoot.</dd></div>
+            <div><dt>A tested core</dt><dd>The layout tree and config parser are a plain Swift module with unit tests.</dd></div>
+          </dl>
           <a class="btn btn-secondary" href="https://github.com/panelab/panespace#cli">Read the CLI docs</a>
         </div>
       </div>
@@ -199,47 +195,50 @@
 
   <section class="section" id="shortcuts" aria-labelledby="keys-title">
     <div class="container">
-      <h2 id="keys-title">The keys you already know</h2>
-      <p class="section-lede"><kbd>$mod</kbd> is <kbd>⌃</kbd><kbd>⌥</kbd> out of the box. Switch it to Caps Lock, <kbd>⌥</kbd>, <kbd>⌘</kbd> or Hyper from the menu bar.</p>
+      <div class="section-head">
+        <h2 id="keys-title">The keys you already know</h2>
+        <p><kbd>$mod</kbd> is <kbd><span class="g g-ctrl" aria-hidden="true"></span><span class="sr-only">Control</span></kbd><kbd><span class="g g-opt" aria-hidden="true"></span><span class="sr-only">Option</span></kbd> out of the box. Switch it to Caps Lock, <kbd><span class="g g-opt" aria-hidden="true"></span><span class="sr-only">Option</span></kbd>, <kbd><span class="g g-cmd" aria-hidden="true"></span><span class="sr-only">Command</span></kbd> or Hyper from the menu bar.</p>
+      </div>
       <dl class="keys">
         <div><dt>Focus left, down, up, right</dt><dd><kbd>$mod</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></dd></div>
-        <div><dt>Move the window</dt><dd><kbd>$mod</kbd><kbd>⇧</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></dd></div>
-        <div><dt>Switch workspace</dt><dd><kbd>$mod</kbd><kbd>1</kbd><span>to</span><kbd>0</kbd></dd></div>
-        <div><dt>Send the window to a workspace</dt><dd><kbd>$mod</kbd><kbd>⇧</kbd><kbd>1</kbd><span>to</span><kbd>0</kbd></dd></div>
-        <div><dt>Split horizontally or vertically</dt><dd><kbd>$mod</kbd><kbd>B</kbd><span>/</span><kbd>V</kbd></dd></div>
-        <div><dt>Tabbed, stacking, toggle split</dt><dd><kbd>$mod</kbd><kbd>W</kbd><span>/</span><kbd>S</kbd><span>/</span><kbd>E</kbd></dd></div>
+        <div><dt>Move the window</dt><dd><kbd>$mod</kbd><kbd><span class="g g-shift" aria-hidden="true"></span><span class="sr-only">Shift</span></kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></dd></div>
+        <div><dt>Switch workspace</dt><dd><kbd>$mod</kbd><kbd>1</kbd><span class="or">to</span><kbd>0</kbd></dd></div>
+        <div><dt>Send the window to a workspace</dt><dd><kbd>$mod</kbd><kbd><span class="g g-shift" aria-hidden="true"></span><span class="sr-only">Shift</span></kbd><kbd>1</kbd><span class="or">to</span><kbd>0</kbd></dd></div>
+        <div><dt>Split horizontally or vertically</dt><dd><kbd>$mod</kbd><kbd>B</kbd><span class="or">or</span><kbd>V</kbd></dd></div>
+        <div><dt>Tabbed, stacking, toggle split</dt><dd><kbd>$mod</kbd><kbd>W</kbd><span class="or">/</span><kbd>S</kbd><span class="or">/</span><kbd>E</kbd></dd></div>
         <div><dt>Full screen</dt><dd><kbd>$mod</kbd><kbd>F</kbd></dd></div>
-        <div><dt>Float or tile the window</dt><dd><kbd>$mod</kbd><kbd>⇧</kbd><kbd>Space</kbd></dd></div>
+        <div><dt>Float or tile the window</dt><dd><kbd>$mod</kbd><kbd><span class="g g-shift" aria-hidden="true"></span><span class="sr-only">Shift</span></kbd><kbd>Space</kbd></dd></div>
         <div><dt>Window hints</dt><dd><kbd>$mod</kbd><kbd>;</kbd></dd></div>
         <div><dt>Search all windows</dt><dd><kbd>$mod</kbd><kbd>/</kbd></dd></div>
         <div><dt>Resize mode</dt><dd><kbd>$mod</kbd><kbd>R</kbd></dd></div>
-        <div><dt>Close the window</dt><dd><kbd>$mod</kbd><kbd>⇧</kbd><kbd>Q</kbd></dd></div>
+        <div><dt>Close the window</dt><dd><kbd>$mod</kbd><kbd><span class="g g-shift" aria-hidden="true"></span><span class="sr-only">Shift</span></kbd><kbd>Q</kbd></dd></div>
       </dl>
     </div>
   </section>
 
   <section class="final" aria-labelledby="final-title">
-    <div class="container final-inner">
+    <div class="container">
       <h2 id="final-title">Stop dragging windows around</h2>
-      <p>Panespace is free and in public beta. Install it, keep your i3 habits, and let every window find its place.</p>
+      <p class="lede">Panespace is free and in public beta. Install it, keep your i3 habits, and let every window find its place.</p>
       <div class="cta-row">
-        <a class="btn btn-primary btn-lg" href="https://github.com/panelab/panespace/releases/latest" data-download>Download the beta</a>
-        <a class="btn btn-ghost btn-lg" href="https://github.com/panelab/panespace#install">Build from source</a>
+        <a class="btn btn-primary btn-lg" href="https://github.com/panelab/panespace/releases/latest" data-download><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8m0 0L4.75 7.25M8 10.5l3.25-3.25M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Download the beta</a>
+        <a class="btn btn-secondary btn-lg" href="https://github.com/panelab/panespace#install">Build from source</a>
       </div>
-      <p class="fine">First launch: right-click the app and choose Open, then allow Accessibility when macOS asks. It's a beta, so expect rough edges and <a href="https://github.com/panelab/panespace/issues">report what breaks</a>.</p>
+      <p class="fine">Runs on Apple silicon and Intel Macs. On first launch, right-click the app and choose Open, then allow Accessibility when macOS asks. It's a beta, so expect rough edges and <a class="link" href="https://github.com/panelab/panespace/issues">report what breaks</a>.</p>
     </div>
   </section>
-
 </main>
 
 <footer class="footer">
   <div class="container footer-inner">
-    <span>© 2026 panelab</span>
+    <a class="brand" href="/"><img src="/icon-64.png" width="20" height="20" alt=""><span>Panespace</span></a>
     <nav aria-label="Footer">
       <a href="https://github.com/panelab/panespace">GitHub</a>
+      <a href="https://github.com/panelab/panespace#readme">Docs</a>
       <a href="https://github.com/panelab/panespace/releases">Releases</a>
-      <a href="https://github.com/panelab/panespace/issues">Issues</a>
+      <a href="https://github.com/panelab/panespace/issues">Report an issue</a>
     </nav>
+    <small>© 2026 panelab</small>
   </div>
 </footer>
 </body>
